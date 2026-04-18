@@ -7,6 +7,7 @@ export interface TokenRef {
 }
 
 export function scanPattern(pattern: string): TokenRef[] {
+  TOKEN_RE.lastIndex = 0
   const map = new Map<string, TokenRef>()
   for (const match of pattern.matchAll(TOKEN_RE)) {
     const name = match[1]
@@ -77,5 +78,6 @@ export function renderBranchName(
   out = out.replace(/([-_])\1+/g, '$1')
   out = out.replace(/^[-_/.]+|[-_/.]+$/g, '')
   out = out.replace(/\/{2,}/g, '/')
+  TOKEN_RE.lastIndex = 0
   return out
 }
