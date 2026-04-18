@@ -1,7 +1,7 @@
 /** Safe-ish slug for a single path segment; allows `/` only via template literals between segments. */
 const INVALID = /[^\w.-]+/g
 
-export function slugifyBranchToken(input: string): string {
+export function slugifyBranchToken(input: string, fallback = 'user'): string {
   const s = input
     .trim()
     .toLowerCase()
@@ -10,5 +10,5 @@ export function slugifyBranchToken(input: string): string {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
 
-  return s || 'user'
+  return s || fallback
 }
