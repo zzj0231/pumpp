@@ -90,8 +90,6 @@ const { branchName } = await pumpBranch('release', {
 ## 文档
 
 - **使用说明**：[`docs/usage.md`](./docs/usage.md)（命令 / 配置 / 模板 / API / 错误码全覆盖）
-- **设计文档**：[`docs/specs/2026-04-18-pumpp-branch-cli-design.md`](./docs/specs/2026-04-18-pumpp-branch-cli-design.md)
-- **实现计划**：[`docs/specs/2026-04-18-pumpp-branch-cli-plan.md`](./docs/specs/2026-04-18-pumpp-branch-cli-plan.md)
 
 ## License
 
