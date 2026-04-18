@@ -3,7 +3,7 @@ import type { PumpBranchResults } from './type/branch-pump-results'
 import type { BranchType } from './type/release-type'
 import process from 'node:process'
 import { ProgressEvent } from './type/branch-pump-progress'
-import { formatBranchTemplate } from './utils/branch-template'
+import { renderBranchName } from './utils/branch-template'
 import { formatYmd } from './utils/date-token'
 import {
   assertGitRepo,
@@ -45,7 +45,7 @@ export async function pumpBranch(raw: PumpBranchOptions = {}): Promise<PumpBranc
   let newBranchName = await raw.customBranchName?.(currentVersion, type)
   if (!newBranchName) {
     const pattern = patternForType({ releasePattern, featurePattern, hotfixPattern }, type)
-    newBranchName = formatBranchTemplate(pattern, {
+    newBranchName = renderBranchName(pattern, {
       version: slugifyBranchToken(currentVersion),
       date,
       username,
