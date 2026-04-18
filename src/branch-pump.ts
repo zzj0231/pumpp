@@ -4,7 +4,7 @@ import type { BranchType } from './type/release-type'
 import process from 'node:process'
 import { ProgressEvent } from './type/branch-pump-progress'
 import { formatBranchTemplate } from './utils/branch-template'
-import { formatDateYmd } from './utils/date-token'
+import { formatYmd } from './utils/date-token'
 import {
   assertGitRepo,
   createBranch,
@@ -40,7 +40,7 @@ export async function pumpBranch(raw: PumpBranchOptions = {}): Promise<PumpBranc
 
   const currentVersion = readManifestVersion(cwd, file, versionKey)
   const username = await getGitUserSlug(cwd)
-  const date = formatDateYmd()
+  const date = formatYmd(new Date())
 
   let newBranchName = await raw.customBranchName?.(currentVersion, type)
   if (!newBranchName) {
