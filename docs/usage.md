@@ -39,6 +39,9 @@ pnpm add -g pumpp
 零配置即可用（内置 `release / feature / hotfix` 三类）：
 
 ```bash
+# 一步生成 pumpp.config.ts 脚手架（可选；零配置也能跑）
+pumpp init
+
 # 从 main 切一条 release 分支，默认 pattern: release/{version}-{date}
 pumpp release
 # → 弹出可编辑的确认提示（见下），然后执行：git branch release/1.2.3-20260418 main
@@ -95,9 +98,25 @@ Commands:
   feature             Create a feature branch
   hotfix              Create a hotfix branch
   <user-defined>      Any type registered in pumpp.config.ts
+  init                Scaffold a pumpp.config file in the current directory
 
 Run without a command to pick a type interactively.
 ```
+
+### 4.1.1 `pumpp init`
+
+脚手架命令，一行产出带注释 + `definePumpConfig()` 包装的 starter 配置文件。
+
+```bash
+pumpp init                 # 生成 pumpp.config.ts（默认）
+pumpp init --format mjs    # 生成 pumpp.config.mjs
+pumpp init --format json   # 生成 pumpp.config.json
+pumpp init --force         # 覆盖已存在的配置
+```
+
+- 检测到任意已存在的 `pumpp.config.{ts,mts,mjs,cjs,js,json}` → 退出码 `1`，提示加 `--force`
+- `--cwd <dir>` 可把文件写到指定目录
+- 生成的模板包含：三类内置 type、manifest 配置、被注释掉的 `tokenProviders` 和 `customBranchName` 示例（即刻可用 + 渐进式解锁定制）
 
 ### 4.2 全局选项
 
@@ -175,6 +194,12 @@ export default definePumpConfig({
   tokenProviders: [
     // 自定义 token provider（见 §7）
   ],
+
+  // 可选：对生成的分支名做最终变换（见 §7.2）
+  // customBranchName: (ctx) => {
+  //   if (/-(?:alpha|beta|rc)/.test(ctx.tokens.version ?? ''))
+  //     return ctx.branchName.replace(/^release\//, 'prerelease/')
+  // },
 })
 ```
 
@@ -225,7 +250,18 @@ feature/{username}-{date}-{desc?}
 
 ---
 
-## 7. 扩展：自定义 token provider
+## 7. 扩展：三层定制能力
+
+从"临时改一次"到"写死规则"，pumpp 提供四种互补的钩子，由细到粗：
+
+| 层 | 何时用 | 粒度 | 入口 |
+| --- | --- | --- | --- |
+| §2.1 可编辑 prompt | 一次性微调这一条分支名 | 单次 | CLI 运行时 prompt |
+| §7.1 覆盖 token provider | 改 `{version}` / `{date}` 等某个 token 的值 | 所有用到该 token 的分支 | `pumpp.config` 的 `tokenProviders` |
+| §7.2 `customBranchName` hook | 对完整分支名做最终变换（条件路由 / 替换） | 每类型 或 全局 | `pumpp.config` 或 `pumpBranch()` runtime |
+| §8 编程式 `pumpBranch()` | 完全自定义流程 | 任意 | TS/JS 脚本 |
+
+### 7.1 自定义 / 覆盖 token provider
 
 ```ts
 import { definePumpConfig } from 'pumpp'
@@ -235,16 +271,23 @@ export default definePumpConfig({
     feature: { pattern: 'feature/{ticket}-{desc}' },
   },
   tokenProviders: [
+    // 新增 {ticket} token
     {
       name: 'ticket',
-      resolve: (ctx) => {
-        // 从环境变量、当前分支名、API 等任意来源取
-        return process.env.JIRA_TICKET?.toLowerCase()
+      resolve: () => process.env.JIRA_TICKET?.toLowerCase(),
+    },
+    // 覆盖内置 {version}：把 1.2.3 → 1_2_3
+    {
+      name: 'version',
+      resolve: async (ctx) => {
+        const pkg = await import(`${ctx.cwd}/package.json`, { assert: { type: 'json' } })
+        return String(pkg.default.version).replace(/\./g, '_')
       },
     },
+    // 依赖其它 token：topo 排序保证先解析 username
     {
       name: 'env-suffix',
-      dependsOn: ['username'], // 拓扑排序会先解析 username
+      dependsOn: ['username'],
       resolve: ctx => `${ctx.tokens.username}-prod`,
     },
   ],
@@ -273,6 +316,54 @@ interface TokenContext {
 - **返回 `undefined` 或空串**：视为未解析；若该 token 是必需的 → 抛 `UNRESOLVED_TOKEN`
 - **用户 provider 会与内置 provider 合并**，同名时**用户覆盖内置**
 - **循环依赖** → `CONFIG_INVALID`
+
+### 7.2 `customBranchName` 钩子：条件路由 / 最终变换
+
+当 token-level 覆盖不够用——例如"pre-release 版本要改前缀"——挂一个 `customBranchName` 钩子：
+
+```ts
+import { definePumpConfig } from 'pumpp'
+
+export default definePumpConfig({
+  types: {
+    release: {
+      pattern: 'release/{version}-{date}',
+      // 只对 release 生效
+      customBranchName: (ctx) => {
+        if (/-(?:alpha|beta|rc)/.test(ctx.tokens.version ?? ''))
+          return ctx.branchName.replace(/^release\//, 'prerelease/')
+      },
+    },
+  },
+  // 对所有类型兜底生效
+  customBranchName: ctx => ctx.branchName.toLowerCase(),
+})
+```
+
+**合并优先级**（高 → 低）：
+
+1. `pumpBranch(type, { customBranchName })` runtime（编程式 API 调用）
+2. `types.X.customBranchName` （类型级）
+3. `customBranchName` （全局）
+
+**签名：**
+
+```ts
+type CustomBranchNameHook = (ctx: NameContext) => string | Promise<string | void> | void
+
+interface NameContext {
+  type: string
+  pattern: string
+  tokens: Record<string, string> // 已 slugify 的完整 token map
+  typeConfig: ResolvedTypeConfig
+}
+```
+
+- 返回 **非空字符串** → 作为新分支名，继续跑 `git check-ref-format` 校验和碰撞检测
+- 返回 `undefined` / `void` / 空串 → 保留默认渲染结果
+- 支持 `async` / 返回 `Promise`
+
+**注意**：hook 返回的名字不走 slugify（`slugifyBranchToken` 只处理单个 token 值），所以你有权返回任意带 `/` 的合法 Git ref；但仍受 `git check-ref-format --branch` 校验。
 
 ---
 

@@ -2,6 +2,7 @@ import type { PumpBranchProgress } from '../type/pump-branch-progress'
 import type { ResolvedPumpConfig } from '../type/pump-config'
 import type { PumpRuntimeOptions } from '../type/pump-runtime-options'
 import type { GlobalFlags } from './parse-args'
+import path from 'node:path'
 import process from 'node:process'
 import { green, red, yellow } from 'kolorist'
 import { pumpBranch } from '../branch-pump'
@@ -9,6 +10,7 @@ import { defaultDeps } from '../default-deps'
 import { errorCodeToExit, PumppError, toPumppError } from '../errors'
 import { ProgressEvent } from '../type/pump-branch-progress'
 import { ExitCode } from './exit-code'
+import { runInit } from './init'
 import { parseArgs } from './parse-args'
 import { symbols } from './symbols'
 
@@ -30,6 +32,17 @@ export async function main(argv = process.argv): Promise<void> {
           code: 'UNKNOWN_BRANCH_TYPE',
           hint: `Known types: ${Object.keys(config.types).join(', ')}`,
         })
+
+      case 'init': {
+        const cwd = global.cwd ?? process.cwd()
+        const result = await runInit({ cwd, format: intent.format, force: intent.force })
+        if (!global.quiet) {
+          const rel = path.relative(process.cwd(), result.path) || path.basename(result.path)
+          const verb = result.overwrote ? 'overwrote' : 'created'
+          console.log(`${symbols.success} ${verb} ${rel}`)
+        }
+        return
+      }
 
       case 'interactive': {
         const deps = defaultDeps()

@@ -4,10 +4,12 @@
 
 `bumpp` 管版本号，`pumpp` 管分支名。按项目既定的命名规范（`release/{version}-{date}`、`feature/{username}-{date}-{desc?}` 等）一键生成并创建分支。
 
-- **零配置可用**：内置 `release` / `feature` / `hotfix` 三类
+- **零配置可用**：内置 `release` / `feature` / `hotfix` 三类；`pumpp init` 一键出脚手架
 - **配置驱动**：在 `pumpp.config.ts` 里注册任意类型，CLI 子命令自动生成
 - **模板 + token**：`{version}` / `{date}` / `{username}` / `{desc?}` 等 8 类内置 token，支持自定义
 - **可选 token**：`{desc?}` 未解析时连同分隔符一并清理
+- **可编辑确认 prompt**：不是简单 Y/N——可就地改分支名再提交
+- **三层定制**：token provider 覆盖 / `customBranchName` 钩子 / 编程式 API，按需选
 - **Git 安全**：干净工作区检查、`git check-ref-format` 校验、同名分支探测
 - **完整 DI**：核心流水线可注入 deps，易于测试与嵌入
 
@@ -25,6 +27,9 @@ Node.js `>= 18`。
 ## 快速开始
 
 ```bash
+# 一键生成 pumpp.config.ts 脚手架（可选；不跑也能用）
+pumpp init
+
 # 从 main 切一条 release 分支，默认 pattern: release/{version}-{date}
 pumpp release
 
@@ -41,7 +46,7 @@ pumpp hotfix --desc cve-fix --push -y
 
 ## 自定义
 
-在项目根加 `pumpp.config.ts`：
+手写（或 `pumpp init` 之后）在项目根留一份 `pumpp.config.ts`：
 
 ```ts
 import { definePumpConfig } from 'pumpp'
@@ -72,6 +77,22 @@ export default definePumpConfig({
       resolve: () => process.env.JIRA_TICKET?.toLowerCase(),
     },
   ],
+})
+```
+
+条件路由 / 最终变换——`customBranchName` 钩子（全局或每类型）：
+
+```ts
+export default definePumpConfig({
+  types: {
+    release: {
+      pattern: 'release/{version}-{date}',
+      customBranchName: (ctx) => {
+        if (/-(?:alpha|beta|rc)/.test(ctx.tokens.version ?? ''))
+          return ctx.branchName.replace(/^release\//, 'prerelease/')
+      },
+    },
+  },
 })
 ```
 

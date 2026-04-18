@@ -77,4 +77,18 @@ describe('pumpp CLI (e2e)', () => {
     expect(second.status).toBe(2)
     expect(second.stderr).toMatch(/already exists/i)
   })
+
+  it('init scaffolds pumpp.config.ts; re-run fails; --force overwrites', () => {
+    const first = pumpp(dir, 'init')
+    expect(first.status).toBe(0)
+    expect(first.stdout).toMatch(/created pumpp\.config\.ts/)
+
+    const second = pumpp(dir, 'init')
+    expect(second.status).toBe(1)
+    expect(second.stderr).toMatch(/existing pumpp\.config/i)
+
+    const third = pumpp(dir, 'init', '--force')
+    expect(third.status).toBe(0)
+    expect(third.stdout).toMatch(/overwrote pumpp\.config\.ts/)
+  })
 })

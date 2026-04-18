@@ -1,5 +1,6 @@
 import type { ResolvedPumpConfig } from '../type/pump-config'
 import type { PumpRuntimeOptions } from '../type/pump-runtime-options'
+import type { InitFormat } from './init'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -14,6 +15,7 @@ export type Intent
     | { kind: 'interactive', global: GlobalFlags }
     | { kind: 'unknown', input: string, global: GlobalFlags }
     | { kind: 'run', type: string, runtime: PumpRuntimeOptions, global: GlobalFlags }
+    | { kind: 'init', format: InitFormat, force: boolean, global: GlobalFlags }
 
 export interface GlobalFlags {
   cwd?: string
@@ -41,6 +43,12 @@ export function buildIntent(argv: string[], config: ResolvedPumpConfig): Intent 
 
   registerTypeCommands(cli, config, async () => { /* noop when run:false */ })
 
+  cli
+    .command('init', 'Scaffold a pumpp.config file in the current directory')
+    .option('--format <fmt>', 'File format: ts (default), mjs, or json')
+    .option('--force', 'Overwrite existing config file')
+    .action(() => {})
+
   const emptyCmd = cli.command('', 'Pick a type interactively')
   addSharedOptions(emptyCmd)
   emptyCmd.action(() => {})
@@ -60,6 +68,14 @@ export function buildIntent(argv: string[], config: ResolvedPumpConfig): Intent 
     return { kind: 'version' }
 
   const matched = cli.matchedCommandName
+  if (matched === 'init') {
+    return {
+      kind: 'init',
+      format: normalizeInitFormat(parsed.options.format),
+      force: Boolean(parsed.options.force),
+      global,
+    }
+  }
   if (matched && matched in config.types) {
     return {
       kind: 'run',
@@ -76,17 +92,51 @@ export function buildIntent(argv: string[], config: ResolvedPumpConfig): Intent 
   return { kind: 'interactive', global }
 }
 
+function normalizeInitFormat(raw: unknown): InitFormat {
+  if (raw === 'mjs' || raw === 'json' || raw === 'ts')
+    return raw
+  return 'ts'
+}
+
 export async function parseArgs(argv = process.argv): Promise<{
   intent: Intent
   config: ResolvedPumpConfig
 }> {
   const preliminary = preliminaryScan(argv)
-  const config = await loadPumpConfig(
-    preliminary.cwd ?? process.cwd(),
-    preliminary.configFile,
-  )
+  const cwd = preliminary.cwd ?? process.cwd()
+
+  if (isInitInvocation(argv)) {
+    const stub: ResolvedPumpConfig = {
+      globals: {
+        base: 'main',
+        push: false,
+        checkout: true,
+        confirm: true,
+        gitCheck: true,
+        fetch: false,
+        remote: 'origin',
+        manifest: { file: 'package.json', versionKey: 'version' },
+      },
+      types: {},
+      tokenProviders: [],
+    }
+    return { intent: buildIntent(argv, stub), config: stub }
+  }
+
+  const config = await loadPumpConfig(cwd, preliminary.configFile)
   const intent = buildIntent(argv, config)
   return { intent, config }
+}
+
+function isInitInvocation(argv: string[]): boolean {
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === 'init')
+      return true
+    if (!a.startsWith('-'))
+      return false
+  }
+  return false
 }
 
 function scanBooleanFlags(argv: string[]): Partial<PumpRuntimeOptions> {
