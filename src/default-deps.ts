@@ -24,6 +24,19 @@ function buildPrompt(): PromptDeps {
       })
       return String(value ?? '')
     },
+    async editText(message, initial) {
+      let cancelled = false
+      const { value } = await prompts({ type: 'text', name: 'value', message, initial }, {
+        onCancel: () => {
+          cancelled = true
+          return false
+        },
+      })
+      if (cancelled)
+        return undefined
+      const out = String(value ?? '').trim()
+      return out === '' ? undefined : out
+    },
   }
 }
 

@@ -2,6 +2,11 @@ export interface PromptDeps {
   confirm: (msg: string) => Promise<boolean>
   select: <T>(msg: string, choices: { title: string, value: T, description?: string }[]) => Promise<T>
   text: (msg: string) => Promise<string>
+  /**
+   * Text prompt prefilled with `initial`. User can accept (Enter) or edit inline.
+   * Return `undefined` to signal cancel/abort (ESC, Ctrl-C, or submitted empty).
+   */
+  editText: (msg: string, initial: string) => Promise<string | undefined>
 }
 
 export interface GitDeps {

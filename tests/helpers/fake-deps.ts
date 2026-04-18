@@ -18,6 +18,13 @@ export interface FakeState {
   confirmAnswer: boolean
   selectAnswer?: string
   textAnswer?: string
+  /**
+   * Mock answer for `editText` prompt (the post-render "Branch name" prompt).
+   * - `undefined` (default / key absent) → fake returns `initial` (user pressed Enter to accept)
+   * - `null` → fake returns `undefined` (user cancelled / cleared)
+   * - `string` → fake returns that exact value (user edited the name)
+   */
+  editAnswer?: string | null
 }
 
 export function createFakeDeps(overrides: Partial<FakeState> = {}): { deps: PumpDeps, state: FakeState } {
@@ -74,6 +81,11 @@ export function createFakeDeps(overrides: Partial<FakeState> = {}): { deps: Pump
       confirm: async () => state.confirmAnswer,
       select: async () => state.selectAnswer as never,
       text: async () => state.textAnswer ?? '',
+      editText: async (_msg, initial) => {
+        if (state.editAnswer === null)
+          return undefined
+        return state.editAnswer !== undefined ? state.editAnswer : initial
+      },
     },
   }
   return { deps, state }

@@ -82,11 +82,33 @@ describe('pumpBranch', () => {
     expect(state.pushed).toEqual([r.branchName])
   })
 
-  it('aBORTED_BY_USER when confirm declined', async () => {
-    const { deps } = createFakeDeps({ confirmAnswer: false })
+  it('aBORTED_BY_USER when edit prompt cancelled', async () => {
+    const { deps } = createFakeDeps({ editAnswer: null })
     await expect(pumpBranch('release', { config: baseConfig() }, deps))
       .rejects
       .toMatchObject({ code: 'ABORTED_BY_USER' })
+  })
+
+  it('accepts generated name when user presses Enter (editText returns initial)', async () => {
+    const { deps, state } = createFakeDeps()
+    const r = await pumpBranch('release', { config: baseConfig() }, deps)
+    expect(r.branchName).toBe('release/1.2.3-20260418')
+    expect(state.createdBranches[0].name).toBe('release/1.2.3-20260418')
+  })
+
+  it('uses edited branch name when user types a new value', async () => {
+    const { deps, state } = createFakeDeps({ editAnswer: 'release/1.2.3-rc1' })
+    const r = await pumpBranch('release', { config: baseConfig() }, deps)
+    expect(r.branchName).toBe('release/1.2.3-rc1')
+    expect(state.createdBranches[0].name).toBe('release/1.2.3-rc1')
+  })
+
+  it('re-checks local collision on edited name', async () => {
+    const { deps, state } = createFakeDeps({ editAnswer: 'release/1.2.3-rc1' })
+    state.localBranches.add('release/1.2.3-rc1')
+    await expect(pumpBranch('release', { config: baseConfig() }, deps))
+      .rejects
+      .toMatchObject({ code: 'BRANCH_ALREADY_EXISTS' })
   })
 
   it('iNVALID_BRANCH_NAME when check-ref-format fails', async () => {

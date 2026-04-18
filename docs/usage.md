@@ -41,7 +41,7 @@ pnpm add -g pumpp
 ```bash
 # 从 main 切一条 release 分支，默认 pattern: release/{version}-{date}
 pumpp release
-# → 询问确认后执行：git branch release/1.2.3-20260418 main
+# → 弹出可编辑的确认提示（见下），然后执行：git branch release/1.2.3-20260418 main
 
 # 无参 → 进入交互模式，列出所有已注册类型
 pumpp
@@ -50,9 +50,24 @@ pumpp
 pumpp feature --desc login --dry-run
 # → Dry run: feature/<user>-20260418-login
 
-# 直接创建并推送
+# 跳过提示直接创建并推送
 pumpp hotfix --desc urgent-fix --push -y
 ```
+
+### 2.1 可编辑的分支名提示
+
+按模板生成完分支名后，`pumpp` **不是简单的 y/N 确认**，而是弹一个"带默认值的文本 prompt"：
+
+```
+? Branch name › release/1.2.3-20260418
+```
+
+- **直接 Enter** → 使用默认名（等于原来的 y）
+- **就地修改后 Enter** → 用改过的名字继续；会重新跑 `git check-ref-format` 校验 + 重查本地 / 远端同名碰撞
+- **ESC / Ctrl-C / 清空后 Enter** → 视为取消，退出码 `0`（`ABORTED_BY_USER`）
+- **`-y / --yes`** → 跳过整个 prompt，CI 友好
+
+适合场景：临时加后缀（`-rc1` / `-fix-typo`）、改版本号格式、借 pattern 框架但手动微调单次分支名，都不用 Ctrl-C 重跑。
 
 ---
 
@@ -381,7 +396,10 @@ A：`--dry-run`。preflight 检查也会执行，但不跑 `git branch` / `push`
 A：`--no-git-check`；或在配置里把 `gitCheck: false`。
 
 **Q：同名分支已存在怎么办？**
-A：会抛 `BRANCH_ALREADY_EXISTS`（退出码 2）。解决：`--desc` 加后缀，或手动 `git branch -D`。
+A：会抛 `BRANCH_ALREADY_EXISTS`（退出码 2）。解决：`--desc` 加后缀、在确认提示里就地改名（见 §2.1）、或手动 `git branch -D`。
+
+**Q：生成的分支名不满意，不想 Ctrl-C 重跑怎么办？**
+A：确认提示是**可编辑文本 prompt**（§2.1），直接在里面改，Enter 即用新名；会再跑一遍 `git check-ref-format` 和碰撞检查，非法会抛 `INVALID_BRANCH_NAME`。更结构化的定制见 §7。
 
 **Q：想让 `feature` 从 `dev` 切？**
 A：在 `types.feature.base = 'dev'`，或命令行 `pumpp feature --base dev`。

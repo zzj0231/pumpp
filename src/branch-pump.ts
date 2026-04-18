@@ -84,13 +84,14 @@ async function runPipeline(
   emit(runtime, { event: ProgressEvent.GitPreflight, type, base: effective.base, branchName, dryRun })
 
   if (effective.confirm && !runtime.yes) {
-    const ok = await deps.prompt.confirm(
-      dryRun
-        ? `Dry run: would create "${branchName}" from ${effective.base}. Continue?`
-        : `Create branch "${branchName}" from ${effective.base}?`,
-    )
-    if (!ok)
+    const label = dryRun ? 'Branch name (dry-run)' : 'Branch name'
+    const edited = await deps.prompt.editText(label, branchName)
+    if (edited === undefined)
       throw new PumppError('aborted by user', { code: 'ABORTED_BY_USER' })
+    if (edited !== branchName) {
+      branchName = edited
+      await preflightName(cwd, branchName, effective, deps)
+    }
   }
   emit(runtime, { event: ProgressEvent.Confirmed, type, base: effective.base, branchName, dryRun })
 
@@ -188,10 +189,21 @@ async function preflight(
     catch { /* WARN but do not abort */ }
   }
 
+  await preflightName(cwd, branchName, eff, deps)
+
+  void runtime
+}
+
+async function preflightName(
+  cwd: string,
+  branchName: string,
+  eff: Effective,
+  deps: PumpDeps,
+): Promise<void> {
   if (await deps.git.revParseVerify(cwd, `refs/heads/${branchName}`)) {
     throw new PumppError(`Branch "${branchName}" already exists locally`, {
       code: 'BRANCH_ALREADY_EXISTS',
-      hint: 'Pass --desc to append a unique suffix',
+      hint: 'Pick a different name (or pass --desc to append a suffix)',
     })
   }
 
@@ -202,8 +214,6 @@ async function preflight(
   }
 
   await validateRef(branchName, deps)
-
-  void runtime
 }
 
 function emit(runtime: PumpRuntimeOptions, p: PumpBranchProgress): void {
