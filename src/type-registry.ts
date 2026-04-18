@@ -51,6 +51,7 @@ export function normalizePumpConfig(input: PumpInputConfig): ResolvedPumpConfig 
     globals,
     types,
     tokenProviders: input.tokenProviders ?? [],
+    customBranchName: input.customBranchName,
   }
 }
 
@@ -75,6 +76,7 @@ function normalizeTypeConfig(
     fetch: cfg.fetch ?? globals.fetch,
     requiredTokens: cfg.requiredTokens ?? [],
     description: cfg.description,
+    customBranchName: cfg.customBranchName,
   }
 }
 

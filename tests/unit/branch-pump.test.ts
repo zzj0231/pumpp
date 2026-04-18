@@ -118,7 +118,7 @@ describe('pumpBranch', () => {
       .toMatchObject({ code: 'INVALID_BRANCH_NAME' })
   })
 
-  it('customBranchName hook overrides rendered name', async () => {
+  it('customBranchName hook overrides rendered name (runtime)', async () => {
     const { deps, state } = createFakeDeps()
     const r = await pumpBranch('release', {
       config: baseConfig(),
@@ -127,6 +127,37 @@ describe('pumpBranch', () => {
     }, deps)
     expect(r.branchName).toBe('release/custom-1')
     expect(state.createdBranches[0].name).toBe('release/custom-1')
+  })
+
+  it('customBranchName from global config applies when runtime/type omit it', async () => {
+    const { deps, state } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.customBranchName = ctx => `${ctx.type}/global-${ctx.tokens.version}`
+    const r = await pumpBranch('release', { config: cfg, yes: true }, deps)
+    expect(r.branchName).toBe('release/global-1.2.3')
+    expect(state.createdBranches[0].name).toBe('release/global-1.2.3')
+  })
+
+  it('type-level customBranchName wins over global', async () => {
+    const { deps } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.customBranchName = () => 'release/global-wins'
+    cfg.types.release.customBranchName = () => 'release/type-wins'
+    const r = await pumpBranch('release', { config: cfg, yes: true }, deps)
+    expect(r.branchName).toBe('release/type-wins')
+  })
+
+  it('runtime customBranchName wins over type and global', async () => {
+    const { deps } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.customBranchName = () => 'release/global-wins'
+    cfg.types.release.customBranchName = () => 'release/type-wins'
+    const r = await pumpBranch('release', {
+      config: cfg,
+      yes: true,
+      customBranchName: () => 'release/runtime-wins',
+    }, deps)
+    expect(r.branchName).toBe('release/runtime-wins')
   })
 
   it('progress events fire in order', async () => {

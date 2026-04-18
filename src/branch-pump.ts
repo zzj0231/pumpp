@@ -67,8 +67,11 @@ async function runPipeline(
   if (runtime.desc && !DESC_TOKEN_RE.test(typeConfig.pattern))
     branchName = `${branchName}-${slugifyBranchToken(runtime.desc)}`
 
-  if (runtime.customBranchName) {
-    const override = await runtime.customBranchName({
+  const hook = runtime.customBranchName
+    ?? typeConfig.customBranchName
+    ?? config.customBranchName
+  if (hook) {
+    const override = await hook({
       type,
       pattern: typeConfig.pattern,
       tokens: sluggedTokens,
