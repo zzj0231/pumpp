@@ -1,13 +1,18 @@
-import type { PumpBranchOptions } from './type/branch-pump-options'
+import type { PumpInputConfig } from './type/pump-config'
 
-export const pumpConfigDefaults: PumpBranchOptions = {
-  push: true,
+export const pumpConfigDefaults: PumpInputConfig = {
+  base: 'main',
+  push: false,
   checkout: true,
   confirm: true,
-  file: 'package.json',
-  versionKey: 'version',
-  customBranchName: undefined,
-  releasePattern: 'release/{version}-{date}',
-  featurePattern: 'feature/{username}-{date}',
-  hotfixPattern: 'hotfix/{username}-{date}',
+  gitCheck: true,
+  fetch: false,
+  remote: 'origin',
+  manifest: { file: 'package.json', versionKey: 'version' },
+  types: {
+    release: { pattern: 'release/{version}-{date}' },
+    feature: { pattern: 'feature/{username}-{date}' },
+    hotfix: { pattern: 'hotfix/{username}-{date}' },
+  },
+  tokenProviders: [],
 }

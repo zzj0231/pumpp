@@ -1,8 +1,5 @@
 import type { GitDeps } from '../type/pump-deps'
-import os from 'node:os'
-import process from 'node:process'
 import { x } from 'tinyexec'
-import { slugifyBranchToken } from './slug'
 
 function opts(cwd: string) {
   return { nodeOptions: { cwd }, throwOnError: true } as const
@@ -54,31 +51,4 @@ export const realGit: GitDeps = {
     const { stdout, exitCode } = await safeRun(cwd, ['config', key])
     return exitCode === 0 ? stdout.trim() || undefined : undefined
   },
-}
-
-// Legacy adapters (will be deleted in Task 12 alongside branch-pump.ts stub).
-// They keep the old src/branch-pump.ts compiling during the incremental refactor.
-export async function assertGitRepo(cwd: string): Promise<void> {
-  await realGit.assertRepo(cwd)
-}
-export async function localBranchExists(cwd: string, branch: string): Promise<boolean> {
-  return realGit.revParseVerify(cwd, `refs/heads/${branch}`)
-}
-export async function createBranch(cwd: string, branch: string, checkout: boolean): Promise<void> {
-  await realGit.createBranch(cwd, branch, 'HEAD', checkout)
-}
-export async function pushBranch(cwd: string, remote: string, branch: string): Promise<void> {
-  await realGit.push(cwd, remote, branch)
-}
-export async function getGitUserSlug(cwd: string): Promise<string> {
-  const name = (await realGit.configGet(cwd, 'user.name'))?.trim()
-  if (name)
-    return slugifyBranchToken(name)
-  const fromEnv = process.env.USER || process.env.USERNAME
-  if (fromEnv)
-    return slugifyBranchToken(fromEnv)
-  return slugifyBranchToken(os.userInfo().username || 'user')
-}
-export async function getWorkingTreeStatus(cwd: string): Promise<string> {
-  return realGit.status(cwd)
 }

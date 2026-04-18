@@ -1,4 +1,4 @@
-import type { PumpBranchOptions } from './type/branch-pump-options'
+import type { PumpInputConfig } from './type/pump-config'
 import { createDefineConfig } from 'c12'
 
-export const definePumpConfig = createDefineConfig<PumpBranchOptions>()
+export const definePumpConfig = createDefineConfig<PumpInputConfig>()
