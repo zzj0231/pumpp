@@ -14,17 +14,10 @@
     "workflow"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
-    },
-    "./cli": {
-      "types": "./dist/cli/index.d.mts",
-      "import": "./dist/cli/index.mjs"
-    },
+    ".": "./dist/index.mjs",
+    "./cli": "./dist/cli/index.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "bin": {
     "pumpp": "bin/pumpp.mjs"
