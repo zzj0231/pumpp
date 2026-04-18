@@ -59,18 +59,6 @@ export function cliOptionsToRuntime(o: Record<string, unknown>): PumpRuntimeOpti
     r.date = o.date
   if (typeof o.desc === 'string')
     r.desc = o.desc
-  if (o.yes === true)
-    r.yes = true
-  if (o.dryRun === true)
-    r.dryRun = true
-  if (typeof o.push === 'boolean')
-    r.push = o.push
-  if (typeof o.checkout === 'boolean')
-    r.checkout = o.checkout
-  if (typeof o.fetch === 'boolean')
-    r.fetch = o.fetch
-  if (typeof o.gitCheck === 'boolean')
-    r.gitCheck = o.gitCheck
   if (typeof o.remote === 'string')
     r.remote = o.remote
   if (typeof o.file === 'string')

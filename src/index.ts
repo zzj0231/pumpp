@@ -17,7 +17,7 @@ export type {
   ResolvedTypeConfig,
   TypeInputConfig,
 } from './type/pump-config'
-export type { NameContext, PumpRuntimeOptions } from './type/pump-runtime-options'
 export type { GitDeps, PromptDeps, PumpDeps } from './type/pump-deps'
+export type { NameContext, PumpRuntimeOptions } from './type/pump-runtime-options'
 export type { TokenContext, TokenProviderSpec } from './type/token-provider'
 export { buildBuiltinProviders, resolveTokens } from './utils/token-providers'

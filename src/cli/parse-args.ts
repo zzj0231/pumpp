@@ -64,7 +64,7 @@ export function buildIntent(argv: string[], config: ResolvedPumpConfig): Intent 
     return {
       kind: 'run',
       type: matched,
-      runtime: cliOptionsToRuntime(parsed.options),
+      runtime: { ...cliOptionsToRuntime(parsed.options), ...scanBooleanFlags(argv) },
       global,
     }
   }
@@ -87,6 +87,47 @@ export async function parseArgs(argv = process.argv): Promise<{
   )
   const intent = buildIntent(argv, config)
   return { intent, config }
+}
+
+function scanBooleanFlags(argv: string[]): Partial<PumpRuntimeOptions> {
+  const out: Partial<PumpRuntimeOptions> = {}
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i]
+    switch (a) {
+      case '--push':
+        out.push = true
+        break
+      case '--no-push':
+        out.push = false
+        break
+      case '--fetch':
+        out.fetch = true
+        break
+      case '--no-fetch':
+        out.fetch = false
+        break
+      case '--checkout':
+        out.checkout = true
+        break
+      case '--no-checkout':
+        out.checkout = false
+        break
+      case '--git-check':
+        out.gitCheck = true
+        break
+      case '--no-git-check':
+        out.gitCheck = false
+        break
+      case '-y':
+      case '--yes':
+        out.yes = true
+        break
+      case '--dry-run':
+        out.dryRun = true
+        break
+    }
+  }
+  return out
 }
 
 function preliminaryScan(argv: string[]): { cwd?: string, configFile?: string } {
