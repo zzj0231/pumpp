@@ -8,7 +8,7 @@
 - **配置驱动**：在 `pumpp.config.ts` 里注册任意类型，CLI 子命令自动生成
 - **模板 + token**：`{version}` / `{date}` / `{username}` / `{desc?}` 等 8 类内置 token，支持自定义
 - **可选 token**：`{desc?}` 未解析时连同分隔符一并清理
-- **可编辑确认 prompt**：不是简单 Y/N——可就地改分支名再提交
+- **友好确认菜单**：Accept / Edit / Cancel 三选；选 Edit 可在预填 buffer 里光标就位改分支名
 - **三层定制**：token provider 覆盖 / `customBranchName` 钩子 / 编程式 API，按需选
 - **Git 安全**：干净工作区检查、`git check-ref-format` 校验、同名分支探测
 - **完整 DI**：核心流水线可注入 deps，易于测试与嵌入

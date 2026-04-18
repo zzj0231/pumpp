@@ -44,7 +44,7 @@ pumpp init
 
 # 从 main 切一条 release 分支，默认 pattern: release/{version}-{date}
 pumpp release
-# → 弹出可编辑的确认提示（见下），然后执行：git branch release/1.2.3-20260418 main
+# → 弹出 Accept / Edit / Cancel 确认菜单（见下），然后执行：git branch release/1.2.3-20260418 main
 
 # 无参 → 进入交互模式，列出所有已注册类型
 pumpp
@@ -57,20 +57,26 @@ pumpp feature --desc login --dry-run
 pumpp hotfix --desc urgent-fix --push -y
 ```
 
-### 2.1 可编辑的分支名提示
+### 2.1 确认菜单（Accept / Edit / Cancel）
 
-按模板生成完分支名后，`pumpp` **不是简单的 y/N 确认**，而是弹一个"带默认值的文本 prompt"：
+按模板生成完分支名后，`pumpp` **不是简单的 y/N**，而是先弹一个三选菜单，按 ↑ / ↓ 选：
 
 ```
-? Branch name › release/1.2.3-20260418
+? Branch name: release/1.2.3-20260418
+❯ ✔ Accept    Create this branch as-is
+  ✎ Edit      Modify before creating
+  ✖ Cancel    Abort, do not touch the repo
 ```
 
-- **直接 Enter** → 使用默认名（等于原来的 y）
-- **就地修改后 Enter** → 用改过的名字继续；会重新跑 `git check-ref-format` 校验 + 重查本地 / 远端同名碰撞
-- **ESC / Ctrl-C / 清空后 Enter** → 视为取消，退出码 `0`（`ABORTED_BY_USER`）
-- **`-y / --yes`** → 跳过整个 prompt，CI 友好
+- **✔ Accept**（默认高亮，直接 Enter）→ 用当前分支名继续
+- **✎ Edit** → 进入可编辑输入框，**分支名已预填在 buffer 里**，← / → 移动光标、Backspace 删改，**不会按一个字就清空**；Enter 提交，Ctrl-C 取消
+  - 改完后会重新跑 `git check-ref-format` 校验 + 重查本地 / 远端同名碰撞
+  - 空串提交 = 取消
+- **✖ Cancel** → 干净退出（`ABORTED_BY_USER`，退出码 `0`），不动仓库
+- **Ctrl-C / ESC** → 同 Cancel
+- **`-y / --yes`** → 跳过整个确认，CI 友好
 
-适合场景：临时加后缀（`-rc1` / `-fix-typo`）、改版本号格式、借 pattern 框架但手动微调单次分支名，都不用 Ctrl-C 重跑。
+适合场景：临时加后缀（`-rc1` / `-fix-typo`）、改版本号格式、借 pattern 框架但手动微调单次分支名。
 
 ---
 
@@ -256,7 +262,7 @@ feature/{username}-{date}-{desc?}
 
 | 层 | 何时用 | 粒度 | 入口 |
 | --- | --- | --- | --- |
-| §2.1 可编辑 prompt | 一次性微调这一条分支名 | 单次 | CLI 运行时 prompt |
+| §2.1 Accept/Edit/Cancel 菜单 | 一次性微调这一条分支名 | 单次 | CLI 运行时 prompt |
 | §7.1 覆盖 token provider | 改 `{version}` / `{date}` 等某个 token 的值 | 所有用到该 token 的分支 | `pumpp.config` 的 `tokenProviders` |
 | §7.2 `customBranchName` hook | 对完整分支名做最终变换（条件路由 / 替换） | 每类型 或 全局 | `pumpp.config` 或 `pumpBranch()` runtime |
 | §8 编程式 `pumpBranch()` | 完全自定义流程 | 任意 | TS/JS 脚本 |
@@ -490,7 +496,7 @@ A：`--no-git-check`；或在配置里把 `gitCheck: false`。
 A：会抛 `BRANCH_ALREADY_EXISTS`（退出码 2）。解决：`--desc` 加后缀、在确认提示里就地改名（见 §2.1）、或手动 `git branch -D`。
 
 **Q：生成的分支名不满意，不想 Ctrl-C 重跑怎么办？**
-A：确认提示是**可编辑文本 prompt**（§2.1），直接在里面改，Enter 即用新名；会再跑一遍 `git check-ref-format` 和碰撞检查，非法会抛 `INVALID_BRANCH_NAME`。更结构化的定制见 §7。
+A：在确认菜单里选 **✎ Edit**（§2.1），分支名会预填在输入框里直接改，Enter 提交；改后会再跑 `git check-ref-format` 和碰撞检查，非法会抛 `INVALID_BRANCH_NAME`。更结构化的定制见 §7。
 
 **Q：想让 `feature` 从 `dev` 切？**
 A：在 `types.feature.base = 'dev'`，或命令行 `pumpp feature --base dev`。
