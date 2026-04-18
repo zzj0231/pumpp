@@ -62,7 +62,7 @@ function errorHandler(error: Error | NonZeroExitError): void {
     message += `\n\n${error.stack || ''}`
 
   console.error(message)
-  process.exit(ExitCode.FatalError)
+  process.exit(ExitCode.OperationalError)
 }
 
 /**
