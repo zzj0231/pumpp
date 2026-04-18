@@ -59,7 +59,7 @@ export function toPumppError(e: unknown): PumppError {
     return e
 
   if (e instanceof NonZeroExitError) {
-    const stderr = (e as unknown as { output?: { stderr?: string } }).output?.stderr ?? ''
+    const stderr = e.output?.stderr ?? ''
     const hint = stderr.split('\n').map(s => s.trim()).find(Boolean)
     return new PumppError('git command failed', {
       code: 'GIT_COMMAND_FAILED',
@@ -72,6 +72,6 @@ export function toPumppError(e: unknown): PumppError {
     return new PumppError('aborted', { code: 'ABORTED_BY_USER', cause: e })
   }
 
-  const message = e instanceof Error ? e.message : String(e)
+  const message = e instanceof Error ? e.message : e == null ? '' : String(e)
   return new PumppError(message || 'unknown error', { code: 'UNKNOWN', cause: e })
 }

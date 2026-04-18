@@ -40,18 +40,28 @@ describe('toPumppError', () => {
     expect(toPumppError(e)).toBe(e)
   })
   it('wraps tinyexec NonZeroExitError', () => {
-    const nz = Object.assign(new NonZeroExitError({} as any, { stdout: '', stderr: 'fatal: bad\n' } as any), {})
+    const nz = new NonZeroExitError({} as any, { stdout: '', stderr: 'fatal: bad\n', exitCode: 1 } as any)
     const e = toPumppError(nz)
     expect(e.code).toBe('GIT_COMMAND_FAILED')
     expect(e.hint).toMatch(/fatal: bad/)
     expect(e.cause).toBe(nz)
   })
-  it('recognises SIGINT-style abort', () => {
-    const e = toPumppError(new Error('User force closed the prompt with 0 null'))
-    expect(e.code).toBe('ABORTED_BY_USER')
+  it('recognises all abort-like messages', () => {
+    expect(toPumppError(new Error('User force closed the prompt with 0 null')).code).toBe('ABORTED_BY_USER')
+    expect(toPumppError(new Error('Aborted')).code).toBe('ABORTED_BY_USER')
+    expect(toPumppError(new Error('SIGINT received')).code).toBe('ABORTED_BY_USER')
   })
   it('wraps unknown errors', () => {
     const e = toPumppError(new Error('random'))
     expect(e.code).toBe('UNKNOWN')
+  })
+  it('wraps non-Error thrown values', () => {
+    const fromString = toPumppError('plain string')
+    expect(fromString.code).toBe('UNKNOWN')
+    expect(fromString.message).toBe('plain string')
+
+    const fromNull = toPumppError(null)
+    expect(fromNull.code).toBe('UNKNOWN')
+    expect(fromNull.message).toBe('unknown error')
   })
 })
