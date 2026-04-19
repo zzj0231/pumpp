@@ -6,3 +6,4 @@ dist
 .cursor
 .git/COMMIT_MSG_TMP.txt
 .git/tmp_tree.txt
+.env

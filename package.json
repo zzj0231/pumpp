@@ -38,7 +38,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "publish:npm": "dotenv -e .env -- pnpm publish"
   },
   "dependencies": {
     "c12": "^3.3.3",
@@ -56,6 +57,7 @@
     "@types/prompts": "^2.4.9",
     "@types/semver": "^7.7.1",
     "bumpp": "^11.0.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.2",
     "lint-staged": "^16.2.7",
     "simple-git-hooks": "^2.13.0",
