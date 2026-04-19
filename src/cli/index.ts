@@ -4,7 +4,7 @@ import type { PumpRuntimeOptions } from '../type/pump-runtime-options'
 import type { GlobalFlags } from './parse-args'
 import path from 'node:path'
 import process from 'node:process'
-import { dim, gray, green, red, yellow } from 'kolorist'
+import { bold, gray, green, red, yellow } from 'kolorist'
 import { previewBranchName, pumpBranch } from '../branch-pump'
 import { defaultDeps } from '../default-deps'
 import { errorCodeToExit, PumppError, toPumppError } from '../errors'
@@ -12,7 +12,7 @@ import { ProgressEvent } from '../type/pump-branch-progress'
 import { ExitCode } from './exit-code'
 import { runInit } from './init'
 import { parseArgs } from './parse-args'
-import { symbols } from './symbols'
+import { orange, symbols } from './symbols'
 
 export async function main(argv = process.argv): Promise<void> {
   let global: GlobalFlags = { quiet: false, debug: false }
@@ -170,7 +170,7 @@ async function maybePromptDesc(
 
 function printDescPromptHeader(type: string, pattern: string): void {
   console.log(`${gray('Type:   ')} ${type}`)
-  console.log(`${gray('Pattern:')} ${dim(pattern)}`)
+  console.log(`${gray('Pattern:')} ${bold(orange(pattern))}`)
 }
 
 async function askDesc(
