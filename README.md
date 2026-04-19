@@ -1,56 +1,67 @@
 # pumpp-cli
 
-> **b**ranch-**pumpp** — create convention-based git branches from manifest version and project config.
+> 根据版本号和项目约定，一键生成并创建规范化的 Git 分支。
 
-`pumpp-cli` 是分支管理工具。它按项目配置命名规范（`release/{version}-{date}`、`feature/{username}-{desc?}-{date}` 等）一键生成并创建分支。
+`pumpp-cli` 是一个约定优先的分支命名工具。你只需要定义一次规则，它就会按模板生成分支名，并完成校验、创建、切换，以及可选的推送。
 
-- **零配置可用**：内置 `release` / `feature` / `hotfix` 三类；`pumpp init` 一键出脚手架
-- **配置驱动**：在 `pumpp.config.ts` 里注册任意类型，CLI 子命令自动生成
-- **模板 + token**：`{version}` / `{date}` / `{username}` / `{desc?}` 等 8 类内置 token，支持自定义
-- **可选 token**：`{desc?}` 未解析时连同分隔符一并清理
-- **友好确认菜单**：Accept / Edit / Cancel 三选；选 Edit 可在预填 buffer 里光标就位改分支名
-- **意图驱动**：`release` 全自动；`feature` / `hotfix` TTY 下默认询问 `desc`，空回车给警告 + 二次询问，CI 用 `-y` 跳过
-- **三层定制**：token provider 覆盖 / `customBranchName` 钩子 / 编程式 API，按需选
-- **Git 安全**：干净工作区检查、`git check-ref-format` 校验、同名分支探测
-- **完整 DI**：核心流水线可注入 deps，易于测试与嵌入
+适合这类场景：
 
----
+- 发布分支需要固定带版本号和日期
+- `feature` / `hotfix` 分支想统一带作者、描述、日期
+- 团队想减少手动命名出错，统一分支规范
+- 本地开发和 CI 希望共用同一套规则
+
+## 特性
+
+- **开箱即用**：内置 `release`、`feature`、`hotfix` 三种类型
+- **配置驱动**：在 `pumpp.config.ts` 里新增类型，CLI 会自动生成对应子命令
+- **模板 + token**：支持 `{version}`、`{date}`、`{username}`、`{desc?}` 等内置 token，也支持自定义
+- **可选 token 自动清理**：例如 `{desc?}` 为空时，会连同多余分隔符一起移除
+- **交互友好**：生成后可选择 `Accept`、`Edit`、`Cancel`
+- **Git 安全检查**：支持工作区检查、分支名校验、同名分支探测
+- **可扩展**：支持自定义 token provider、`customBranchName` 钩子和编程式 API
 
 ## 安装
 
 ```bash
-pnpm add -D pumpp-cli      # 项目依赖
-pnpm add -g pumpp-cli      # 或全局
+pnpm add -D pumpp-cli
+# 或
+pnpm add -g pumpp-cli
 ```
 
-Node.js `>= 18`。
+需要 Node.js `>= 18`。
 
 ## 快速开始
 
 ```bash
-# 一键生成 pumpp.config.ts 脚手架（可选；不跑也能用）
+# 可选：生成配置文件脚手架
 pumpp init
 
-# 从 main 切一条 release 分支，默认 pattern: release/{version}-{date}
+# 创建 release 分支
 pumpp release
 
-# 无参 → 交互模式
+# 不带参数时进入交互模式
 pumpp
 
-# 仅解析不写仓库
+# 只预览结果，不修改仓库
 pumpp feature --desc login --dry-run
-# → Dry run: feature/<user>-login-20260418
 
-# 创建并推送
+# 创建并推送 hotfix 分支
 pumpp hotfix --desc cve-fix --push -y
 ```
 
-## 自定义
+默认规则如下：
 
-手写（或 `pumpp init` 之后）在项目根留一份 `pumpp.config.ts`：
+- `release`: `release/{version}-{date}`
+- `feature`: `feature/{username}-{desc?}-{date}`
+- `hotfix`: `hotfix/{username}-{desc?}-{date}`
+
+## 配置示例
+
+在项目根目录创建 `pumpp.config.ts`：
 
 ```ts
-import { definePumpConfig } from 'pumpp'
+import { definePumpConfig } from 'pumpp-cli'
 
 export default definePumpConfig({
   base: 'main',
@@ -63,10 +74,12 @@ export default definePumpConfig({
 })
 ```
 
-自定义 token provider：
+## 自定义 token
+
+如果你想把工单号、环境名等信息放进分支名，可以添加自定义 token provider：
 
 ```ts
-import { definePumpConfig } from 'pumpp'
+import { definePumpConfig } from 'pumpp-cli'
 
 export default definePumpConfig({
   types: {
@@ -81,9 +94,13 @@ export default definePumpConfig({
 })
 ```
 
-条件路由 / 最终变换——`customBranchName` 钩子（全局或每类型）：
+## 自定义最终分支名
+
+如果模板还不够，可以用 `customBranchName` 在最终输出前做一次变换：
 
 ```ts
+import { definePumpConfig } from 'pumpp-cli'
+
 export default definePumpConfig({
   types: {
     release: {
@@ -100,7 +117,7 @@ export default definePumpConfig({
 ## 编程式 API
 
 ```ts
-import { pumpBranch } from 'pumpp'
+import { pumpBranch } from 'pumpp-cli'
 
 const { branchName } = await pumpBranch('release', {
   desc: 'v2-launch',
@@ -109,9 +126,9 @@ const { branchName } = await pumpBranch('release', {
 })
 ```
 
-## 文档
+## 更多文档
 
-- **使用说明**：`[docs/usage.md](./docs/usage.md)`（命令 / 配置 / 模板 / API / 错误码全覆盖）
+- 使用说明：[`docs/usage.md`](./docs/usage.md)
 
 ## License
 
