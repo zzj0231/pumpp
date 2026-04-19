@@ -170,7 +170,7 @@ async function maybePromptDesc(
 
 function printDescPromptHeader(type: string, pattern: string): void {
   console.log(`${gray('Type:   ')} ${type}`)
-  console.log(`${gray('Pattern:')} ${bold(orange(pattern))}`)
+  console.log(`${gray('Pattern:')} ${orange(pattern)}`)
 }
 
 async function askDesc(
