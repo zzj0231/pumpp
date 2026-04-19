@@ -44,6 +44,8 @@ async function runPipeline(
   }
 
   const effective = mergeEffective(typeConfig, config, runtime)
+  if (isHeadAlias(effective.base))
+    effective.base = await resolveHeadAlias(cwd, deps)
   const dryRun = runtime.dryRun === true
   emit(runtime, { event: ProgressEvent.ConfigLoaded, type, base: effective.base, branchName: '', dryRun })
 
@@ -221,4 +223,25 @@ async function preflightName(
 
 function emit(runtime: PumpRuntimeOptions, p: PumpBranchProgress): void {
   runtime.progress?.(p)
+}
+
+function isHeadAlias(base: string): boolean {
+  return base === '.' || base.toLowerCase() === 'head'
+}
+
+async function resolveHeadAlias(cwd: string, deps: PumpDeps): Promise<string> {
+  try {
+    await deps.git.assertRepo(cwd)
+  }
+  catch (e) {
+    throw new PumppError(`Not a git repository: ${cwd}`, { code: 'NOT_A_GIT_REPO', cause: e })
+  }
+  const head = (await deps.git.currentBranch(cwd)).trim()
+  if (!head || head === 'HEAD') {
+    throw new PumppError('Cannot use HEAD as base while in detached HEAD state', {
+      code: 'BASE_BRANCH_MISSING',
+      hint: 'Checkout a branch first, or set base to an explicit branch name',
+    })
+  }
+  return head
 }

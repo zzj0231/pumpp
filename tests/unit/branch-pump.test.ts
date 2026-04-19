@@ -179,4 +179,56 @@ describe('pumpBranch', () => {
       'git-pushed',
     ])
   })
+
+  describe('base: HEAD alias', () => {
+    it('resolves base "HEAD" to the current branch', async () => {
+      const { deps, state } = createFakeDeps({
+        currentBranch: 'develop',
+        localBranches: new Set(['develop']),
+      })
+      const r = await pumpBranch('release', {
+        config: baseConfig(),
+        base: 'HEAD',
+        yes: true,
+      }, deps)
+      expect(r.base).toBe('develop')
+      expect(state.createdBranches[0]).toMatchObject({ base: 'develop' })
+    })
+
+    it('treats "." the same as "HEAD"', async () => {
+      const { deps, state } = createFakeDeps({
+        currentBranch: 'feature/x',
+        localBranches: new Set(['feature/x']),
+      })
+      const r = await pumpBranch('release', {
+        config: baseConfig(),
+        base: '.',
+        yes: true,
+      }, deps)
+      expect(r.base).toBe('feature/x')
+      expect(state.createdBranches[0]).toMatchObject({ base: 'feature/x' })
+    })
+
+    it('is case-insensitive ("head" works)', async () => {
+      const { deps } = createFakeDeps({
+        currentBranch: 'develop',
+        localBranches: new Set(['develop']),
+      })
+      const r = await pumpBranch('release', {
+        config: baseConfig(),
+        base: 'head',
+        yes: true,
+      }, deps)
+      expect(r.base).toBe('develop')
+    })
+
+    it('throws BASE_BRANCH_MISSING in detached HEAD state', async () => {
+      const { deps } = createFakeDeps({ currentBranch: 'HEAD' })
+      await expect(pumpBranch('release', {
+        config: baseConfig(),
+        base: 'HEAD',
+        yes: true,
+      }, deps)).rejects.toMatchObject({ code: 'BASE_BRANCH_MISSING' })
+    })
+  })
 })

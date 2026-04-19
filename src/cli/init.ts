@@ -77,6 +77,7 @@ export default definePumpConfig({
     feature: {
       pattern: 'feature/{username}-{date}-{desc?}',
       description: 'Create a feature branch',
+      // base: 'HEAD', // Cut from the current branch instead of 'main'. '.' works too.
     },
     hotfix: {
       pattern: 'hotfix/{username}-{date}',
@@ -121,6 +122,7 @@ export default {
     feature: {
       pattern: 'feature/{username}-{date}-{desc?}',
       description: 'Create a feature branch',
+      // base: 'HEAD', // Cut from the current branch instead of 'main'. '.' works too.
     },
     hotfix: {
       pattern: 'hotfix/{username}-{date}',
