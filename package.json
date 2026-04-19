@@ -1,5 +1,5 @@
 {
-  "name": "pumpp",
+  "name": "@tomos-zhao/pumpp",
   "type": "module",
   "version": "0.6.0",
   "packageManager": "pnpm@10.25.0",
