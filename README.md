@@ -1,8 +1,8 @@
-# pumpp
+# pumpp-cli
 
 > **b**ranch-**pumpp** — create convention-based git branches from manifest version and project config.
 
-`bumpp` 管版本号，`pumpp` 管分支名。按项目既定的命名规范（`release/{version}-{date}`、`feature/{username}-{desc?}-{date}` 等）一键生成并创建分支。
+`pumpp-cli` 是分支管理工具。它按项目配置命名规范（`release/{version}-{date}`、`feature/{username}-{desc?}-{date}` 等）一键生成并创建分支。
 
 - **零配置可用**：内置 `release` / `feature` / `hotfix` 三类；`pumpp init` 一键出脚手架
 - **配置驱动**：在 `pumpp.config.ts` 里注册任意类型，CLI 子命令自动生成
@@ -19,8 +19,8 @@
 ## 安装
 
 ```bash
-pnpm add -D pumpp      # 项目依赖
-pnpm add -g pumpp      # 或全局
+pnpm add -D pumpp-cli      # 项目依赖
+pnpm add -g pumpp-cli      # 或全局
 ```
 
 Node.js `>= 18`。
@@ -111,7 +111,7 @@ const { branchName } = await pumpBranch('release', {
 
 ## 文档
 
-- **使用说明**：[`docs/usage.md`](./docs/usage.md)（命令 / 配置 / 模板 / API / 错误码全覆盖）
+- **使用说明**：`[docs/usage.md](./docs/usage.md)`（命令 / 配置 / 模板 / API / 错误码全覆盖）
 
 ## License
 
