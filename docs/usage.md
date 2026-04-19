@@ -99,7 +99,21 @@ pumpp hotfix --desc urgent-fix --push -y
 | ✅ | — | — | 不问（CLI 提供） |
 | ❌ | ✅ | — | 不问（`-y` = 信任默认；可选 token 会被清掉） |
 | ❌ | ❌ | ❌ 非 TTY (CI) | 不问；可选 → 渲染成无 desc 名；必需 → `UNRESOLVED_TOKEN` |
-| ❌ | ❌ | ✅ TTY | **弹文本 prompt** 询问 `Description (fills {desc}):` |
+| ❌ | ❌ | ✅ TTY | **弹文本 prompt** 询问 `Description (fills {desc}):`，下方实时刷新分支预览 |
+
+TTY 下的交互长这样（每按一键，`Preview:` 行自动重绘）：
+
+```
+Type:    feature
+Pattern: feature/{username}-{desc?}-{date}
+? Description (fills {desc}): fix-login█
+  Preview: feature/alice-fix-login-20260418
+```
+
+- 用户输入会按 git ref 规则做 slug（大写转小写、空格 / 下划线 → `-`、剥掉非法字符），所以 `Fix Login Bug` 实时预览成 `fix-login-bug`
+- 预览不会执行 `customBranchName` hook（避免每次按键都跑用户代码）；最终生成的分支名仍会跑 hook
+- 非 TTY / 老终端会自动降级为「先静态打印 `Preview:` 一次 + 普通文本输入」，再走下面的空输入逻辑
+- 预览数据准备失败（比如读不到 `package.json` 的 `version`）时，header 与 Preview 行被静默跳过，prompt 流程仍可继续
 
 弹 prompt 后用户输入：
 

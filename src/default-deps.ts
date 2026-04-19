@@ -1,10 +1,15 @@
-import type { PromptDeps, PumpDeps } from './type/pump-deps'
+import type { PromptDeps, PumpDeps, TextWithPreviewOptions } from './type/pump-deps'
 import process from 'node:process'
 import readline from 'node:readline'
-import { bold, dim, green, red, yellow } from 'kolorist'
+import { bold, dim, gray, green, red, yellow } from 'kolorist'
 import prompts from 'prompts'
 import { realGit } from './utils/git-ops'
 import { readManifestVersion } from './utils/manifest'
+
+const ANSI_SAVE_CURSOR = '\x1B7'
+const ANSI_RESTORE_CURSOR = '\x1B8'
+const ANSI_CURSOR_DOWN_1 = '\x1B[1B'
+const ANSI_CLEAR_LINE = '\x1B[2K'
 
 function readlineEdit(message: string, initial: string): Promise<string | undefined> {
   if (!process.stdin.isTTY)
@@ -95,7 +100,95 @@ function buildPrompt(): PromptDeps {
       const trimmed = answer.trim()
       return trimmed === '' ? undefined : trimmed
     },
+    textWithPreview,
   }
+}
+
+async function textWithPreview(opts: TextWithPreviewOptions): Promise<string | undefined> {
+  const initial = opts.initial ?? ''
+  if (!process.stdout.isTTY || !process.stdin.isTTY)
+    return textWithStaticPreview(opts, initial)
+
+  const reservePreviewLine = (): void => {
+    process.stdout.write(`\n\x1B[1A`)
+  }
+  const safeRender = (val: string): string => {
+    try {
+      return opts.renderWith(val)
+    }
+    catch {
+      return '(unavailable)'
+    }
+  }
+  const drawPreview = (val: string): void => {
+    const preview = safeRender(val)
+    process.stdout.write(
+      `${ANSI_SAVE_CURSOR}${ANSI_CURSOR_DOWN_1}\r${ANSI_CLEAR_LINE}  ${gray('Preview:')} ${dim(preview)}${ANSI_RESTORE_CURSOR}`,
+    )
+  }
+  const clearPreviewLine = (): void => {
+    process.stdout.write(`\r${ANSI_CLEAR_LINE}`)
+  }
+
+  reservePreviewLine()
+  drawPreview(initial)
+
+  let cancelled = false
+  let result: string | undefined
+
+  try {
+    const { value } = await prompts({
+      type: 'text',
+      name: 'value',
+      message: opts.message,
+      initial,
+      onState({ value, aborted }) {
+        if (aborted) {
+          cancelled = true
+          return
+        }
+        drawPreview(String(value ?? ''))
+      },
+    }, {
+      onCancel: () => {
+        cancelled = true
+        return false
+      },
+    })
+    result = value === undefined ? '' : String(value)
+  }
+  finally {
+    clearPreviewLine()
+  }
+
+  return cancelled ? undefined : result
+}
+
+async function textWithStaticPreview(opts: TextWithPreviewOptions, initial: string): Promise<string | undefined> {
+  let preview: string
+  try {
+    preview = opts.renderWith(initial)
+  }
+  catch {
+    preview = '(unavailable)'
+  }
+  process.stdout.write(`  ${gray('Preview:')} ${dim(preview)}\n`)
+
+  let cancelled = false
+  const { value } = await prompts({
+    type: 'text',
+    name: 'value',
+    message: opts.message,
+    initial,
+  }, {
+    onCancel: () => {
+      cancelled = true
+      return false
+    },
+  })
+  if (cancelled)
+    return undefined
+  return value === undefined ? '' : String(value)
 }
 
 export function defaultDeps(): PumpDeps {

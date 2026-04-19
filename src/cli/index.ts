@@ -4,8 +4,8 @@ import type { PumpRuntimeOptions } from '../type/pump-runtime-options'
 import type { GlobalFlags } from './parse-args'
 import path from 'node:path'
 import process from 'node:process'
-import { green, red, yellow } from 'kolorist'
-import { pumpBranch } from '../branch-pump'
+import { dim, gray, green, red, yellow } from 'kolorist'
+import { previewBranchName, pumpBranch } from '../branch-pump'
 import { defaultDeps } from '../default-deps'
 import { errorCodeToExit, PumppError, toPumppError } from '../errors'
 import { ProgressEvent } from '../type/pump-branch-progress'
@@ -115,8 +115,9 @@ const DESC_TOKEN_RE = /\{desc\??\}/
  *  - the user did not pass `-y/--yes`,
  *  - and stdin is a TTY (skip silently in CI).
  *
- * If the user submits an empty value, warn and confirm whether to proceed
- * without a description; on declining, ask once more (no further loops).
+ * Shows a live preview of the rendered branch name beneath the input on every
+ * keystroke (when `textWithPreview` is available), then warns + re-asks once if
+ * the user submits an empty value.
  */
 async function maybePromptDesc(
   type: string,
@@ -136,7 +137,19 @@ async function maybePromptDesc(
   if (!process.stdin.isTTY)
     return base
 
-  const first = (await deps.prompt.text('Description (fills {desc}):')).trim()
+  let renderWith: ((d: string) => string) | undefined
+  try {
+    const previewRuntime: PumpRuntimeOptions = { ...base, config }
+    const preview = await previewBranchName(type, previewRuntime, deps)
+    renderWith = preview.renderWith
+    printDescPromptHeader(type, typeCfg.pattern)
+  }
+  catch {
+    // Preview prep failed (missing manifest, etc.) — degrade silently and
+    // fall back to a plain text prompt without preview.
+  }
+
+  const first = (await askDesc(deps, renderWith)).trim()
   if (first)
     return { ...base, desc: first }
 
@@ -149,10 +162,29 @@ async function maybePromptDesc(
   if (proceed)
     return base
 
-  const second = (await deps.prompt.text('Description (fills {desc}):')).trim()
+  const second = (await askDesc(deps, renderWith)).trim()
   if (second)
     return { ...base, desc: second }
   return base
+}
+
+function printDescPromptHeader(type: string, pattern: string): void {
+  console.log(`${gray('Type:   ')} ${type}`)
+  console.log(`${gray('Pattern:')} ${dim(pattern)}`)
+}
+
+async function askDesc(
+  deps: ReturnType<typeof defaultDeps>,
+  renderWith: ((d: string) => string) | undefined,
+): Promise<string> {
+  const message = 'Description (fills {desc}):'
+  if (renderWith && deps.prompt.textWithPreview) {
+    const value = await deps.prompt.textWithPreview({ message, renderWith })
+    if (value === undefined)
+      throw new PumppError('aborted by user', { code: 'ABORTED_BY_USER' })
+    return value
+  }
+  return await deps.prompt.text(message)
 }
 
 function handleError(raw: unknown, global: GlobalFlags): void {

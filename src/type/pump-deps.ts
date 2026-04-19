@@ -1,3 +1,14 @@
+export interface TextWithPreviewOptions {
+  message: string
+  /**
+   * Pure synchronous renderer called on every keystroke to produce the
+   * preview string drawn just below the input field. Should be cheap.
+   */
+  renderWith: (current: string) => string
+  /** Optional initial text (default: empty). */
+  initial?: string
+}
+
 export interface PromptDeps {
   confirm: (msg: string) => Promise<boolean>
   select: <T>(msg: string, choices: { title: string, value: T, description?: string }[]) => Promise<T>
@@ -7,6 +18,15 @@ export interface PromptDeps {
    * Return `undefined` to signal cancel/abort (ESC, Ctrl-C, or submitted empty).
    */
   editText: (msg: string, initial: string) => Promise<string | undefined>
+  /**
+   * Optional text prompt that renders a live preview line under the input on
+   * every keystroke (TTY only). Implementations MAY fall back to a static
+   * preview + plain text prompt for non-TTY / dumb terminals.
+   *
+   * Returns the raw user input (empty string on no input). Returns `undefined`
+   * if the user cancelled (ESC / Ctrl-C).
+   */
+  textWithPreview?: (opts: TextWithPreviewOptions) => Promise<string | undefined>
 }
 
 export interface GitDeps {

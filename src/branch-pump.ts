@@ -15,6 +15,24 @@ import { validateRef } from './utils/validate-ref'
 
 const DESC_TOKEN_RE = /\{desc\??\}/
 
+export interface PreviewBranchResult {
+  type: string
+  pattern: string
+  branchName: string
+  tokens: Record<string, string>
+  /**
+   * Cheap synchronous re-render with a different `desc` value.
+   *
+   * Reuses pre-resolved tokens (no extra git / manifest IO), slugs the input,
+   * and mirrors the same "fill {desc?} slot OR append after-the-fact" logic
+   * `pumpBranch` uses. Note: `customBranchName` hooks are NOT applied here —
+   * keystroke handlers cannot await arbitrary user code. The returned
+   * `branchName` field above DOES include hook output for the initial empty
+   * desc, so live previews stay close to the final result for typical configs.
+   */
+  renderWith: (desc?: string) => string
+}
+
 export async function pumpBranch(
   type: string,
   runtime: PumpRuntimeOptions = {},
@@ -33,41 +51,16 @@ async function runPipeline(
   runtime: PumpRuntimeOptions,
   deps: PumpDeps,
 ): Promise<PumpBranchResults> {
-  const cwd = runtime.cwd ?? process.cwd()
-  const config = runtime.config ?? await loadPumpConfig(cwd, runtime.configFile)
-  const typeConfig = config.types[type]
-  if (!typeConfig) {
-    throw new PumppError(`Unknown branch type "${type}"`, {
-      code: 'UNKNOWN_BRANCH_TYPE',
-      hint: `Known types: ${Object.keys(config.types).join(', ') || '(none)'}`,
-    })
-  }
+  const { cwd, config, typeConfig, sluggedTokens, branchName: rendered } = await resolveAndRender(type, runtime, deps)
 
   const effective = mergeEffective(typeConfig, config, runtime)
   if (isHeadAlias(effective.base))
     effective.base = await resolveHeadAlias(cwd, deps)
   const dryRun = runtime.dryRun === true
   emit(runtime, { event: ProgressEvent.ConfigLoaded, type, base: effective.base, branchName: '', dryRun })
-
-  const tokens = await resolveTokens({
-    pattern: typeConfig.pattern,
-    providers: config.tokenProviders,
-    ctx: {
-      cwd,
-      type,
-      globals: config.globals,
-      typeConfig,
-      runtime,
-      tokens: {},
-    },
-    deps,
-  })
-  const sluggedTokens = slugValues(tokens)
   emit(runtime, { event: ProgressEvent.TokensResolved, type, base: effective.base, branchName: '', dryRun })
 
-  let branchName = renderBranchName(typeConfig.pattern, sluggedTokens)
-  if (runtime.desc && !DESC_TOKEN_RE.test(typeConfig.pattern))
-    branchName = `${branchName}-${slugifyBranchToken(runtime.desc)}`
+  let branchName = rendered
 
   const hook = runtime.customBranchName
     ?? typeConfig.customBranchName
@@ -119,6 +112,113 @@ async function runPipeline(
     username: sluggedTokens.username ?? '',
     version: sluggedTokens.version,
     desc: runtime.desc,
+  }
+}
+
+interface ResolveAndRenderResult {
+  cwd: string
+  config: ResolvedPumpConfig
+  typeConfig: ResolvedTypeConfig
+  sluggedTokens: Record<string, string>
+  branchName: string
+}
+
+async function resolveAndRender(
+  type: string,
+  runtime: PumpRuntimeOptions,
+  deps: PumpDeps,
+): Promise<ResolveAndRenderResult> {
+  const cwd = runtime.cwd ?? process.cwd()
+  const config = runtime.config ?? await loadPumpConfig(cwd, runtime.configFile)
+  const typeConfig = config.types[type]
+  if (!typeConfig) {
+    throw new PumppError(`Unknown branch type "${type}"`, {
+      code: 'UNKNOWN_BRANCH_TYPE',
+      hint: `Known types: ${Object.keys(config.types).join(', ') || '(none)'}`,
+    })
+  }
+
+  const tokens = await resolveTokens({
+    pattern: typeConfig.pattern,
+    providers: config.tokenProviders,
+    ctx: {
+      cwd,
+      type,
+      globals: config.globals,
+      typeConfig,
+      runtime,
+      tokens: {},
+    },
+    deps,
+  })
+  const sluggedTokens = slugValues(tokens)
+
+  let branchName = renderBranchName(typeConfig.pattern, sluggedTokens)
+  if (runtime.desc && !DESC_TOKEN_RE.test(typeConfig.pattern))
+    branchName = `${branchName}-${slugifyBranchToken(runtime.desc)}`
+
+  return { cwd, config, typeConfig, sluggedTokens, branchName }
+}
+
+/**
+ * Preview the branch name without touching the working tree, remote, or running
+ * the `customBranchName` hook on every keystroke.
+ *
+ * Resolves config + tokens once, then returns a synchronous `renderWith(desc)`
+ * closure that the CLI uses to drive the live preview line under the desc
+ * input. Token resolution still runs (so version / username / git read happen),
+ * but git mutation, preflight, and the (potentially async) custom hook are
+ * skipped on every re-render.
+ */
+export async function previewBranchName(
+  type: string,
+  runtime: PumpRuntimeOptions = {},
+  deps: PumpDeps = defaultDeps(),
+): Promise<PreviewBranchResult> {
+  const baseRuntime: PumpRuntimeOptions = { ...runtime, desc: undefined }
+  const { config, typeConfig, sluggedTokens } = await resolveAndRender(
+    type,
+    baseRuntime,
+    deps,
+  )
+
+  const pattern = typeConfig.pattern
+  const hasDescSlot = DESC_TOKEN_RE.test(pattern)
+
+  const renderWith = (desc?: string): string => {
+    const trimmed = desc?.trim() ?? ''
+    if (!trimmed) {
+      const tokens = { ...sluggedTokens }
+      delete tokens.desc
+      return renderBranchName(pattern, tokens)
+    }
+    const slug = slugifyBranchToken(trimmed)
+    const tokens = { ...sluggedTokens, desc: slug }
+    const name = renderBranchName(pattern, tokens)
+    return hasDescSlot ? name : `${name}-${slug}`
+  }
+
+  let branchName = renderWith(runtime.desc)
+  const hook = runtime.customBranchName
+    ?? typeConfig.customBranchName
+    ?? config.customBranchName
+  if (hook) {
+    const override = await hook({
+      type,
+      pattern,
+      tokens: sluggedTokens,
+      typeConfig,
+    })
+    if (typeof override === 'string' && override.trim())
+      branchName = override.trim()
+  }
+
+  return {
+    type,
+    pattern,
+    branchName,
+    tokens: sluggedTokens,
+    renderWith,
   }
 }
 

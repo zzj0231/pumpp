@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pumpBranch } from '../../src/branch-pump'
+import { previewBranchName, pumpBranch } from '../../src/branch-pump'
 import { pumpConfigDefaults } from '../../src/config'
 import { mergeTokenProviders, normalizePumpConfig } from '../../src/type-registry'
 import { buildBuiltinProviders } from '../../src/utils/token-providers'
@@ -253,5 +253,56 @@ describe('pumpBranch', () => {
         yes: true,
       }, deps)).rejects.toMatchObject({ code: 'BASE_BRANCH_MISSING' })
     })
+  })
+})
+
+describe('previewBranchName', () => {
+  it('renders the optional {desc?} slot empty by default', async () => {
+    const { deps } = createFakeDeps()
+    const p = await previewBranchName('feature', { config: baseConfig() }, deps)
+    expect(p.type).toBe('feature')
+    expect(p.pattern).toBe('feature/{username}-{desc?}-{date}')
+    expect(p.branchName).toBe('feature/alice-20260418')
+  })
+
+  it('renderWith() slugs and fills {desc?} on demand without re-resolving tokens', async () => {
+    const { deps } = createFakeDeps()
+    const p = await previewBranchName('feature', { config: baseConfig() }, deps)
+    expect(p.renderWith('Fix Login Bug')).toBe('feature/alice-fix-login-bug-20260418')
+    expect(p.renderWith('  ')).toBe('feature/alice-20260418')
+    expect(p.renderWith()).toBe('feature/alice-20260418')
+  })
+
+  it('appends desc with separator when pattern has no {desc} slot', async () => {
+    const { deps } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.types.feature.pattern = 'feature/{username}-{date}'
+    const p = await previewBranchName('feature', { config: cfg }, deps)
+    expect(p.renderWith('login')).toBe('feature/alice-20260418-login')
+    expect(p.renderWith('')).toBe('feature/alice-20260418')
+  })
+
+  it('runs customBranchName hook for the initial branchName but not in renderWith', async () => {
+    const { deps } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.customBranchName = ctx => `${ctx.type}/hooked-${ctx.tokens.username}`
+    const p = await previewBranchName('feature', { config: cfg }, deps)
+    expect(p.branchName).toBe('feature/hooked-alice')
+    expect(p.renderWith('login')).toBe('feature/alice-login-20260418')
+  })
+
+  it('throws UNKNOWN_BRANCH_TYPE for unknown type', async () => {
+    const { deps } = createFakeDeps()
+    await expect(previewBranchName('rc', { config: baseConfig() }, deps))
+      .rejects
+      .toMatchObject({ code: 'UNKNOWN_BRANCH_TYPE' })
+  })
+
+  it('does not touch git (no branches created, no fetch, no push)', async () => {
+    const { deps, state } = createFakeDeps()
+    await previewBranchName('release', { config: baseConfig() }, deps)
+    expect(state.createdBranches).toHaveLength(0)
+    expect(state.pushed).toHaveLength(0)
+    expect(state.fetched).toHaveLength(0)
   })
 })
