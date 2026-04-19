@@ -1,5 +1,5 @@
 {
-  "name": " @tomos/pumpp",
+  "name": "pumpp-cli",
   "type": "module",
   "version": "0.6.0",
   "packageManager": "pnpm@10.25.0",
@@ -30,7 +30,8 @@
     "node": ">=18.0.0"
   },
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "scripts": {
     "lint": "eslint .",
