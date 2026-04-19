@@ -1,7 +1,7 @@
 {
   "name": "pumpp-cli",
   "type": "module",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "packageManager": "pnpm@10.25.0",
   "description": "Create convention-based git branches from manifest version and project config (bumpp-style CLI)",
   "author": "sky tomos",
