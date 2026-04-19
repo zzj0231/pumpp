@@ -75,12 +75,12 @@ export default definePumpConfig({
       description: 'Create a release branch',
     },
     feature: {
-      pattern: 'feature/{username}-{date}-{desc?}',
+      pattern: 'feature/{username}-{desc?}-{date}',
       description: 'Create a feature branch',
       // base: 'HEAD', // Cut from the current branch instead of 'main'. '.' works too.
     },
     hotfix: {
-      pattern: 'hotfix/{username}-{date}',
+      pattern: 'hotfix/{username}-{desc?}-{date}',
       description: 'Create a hotfix branch',
     },
   },
@@ -120,12 +120,12 @@ export default {
       description: 'Create a release branch',
     },
     feature: {
-      pattern: 'feature/{username}-{date}-{desc?}',
+      pattern: 'feature/{username}-{desc?}-{date}',
       description: 'Create a feature branch',
       // base: 'HEAD', // Cut from the current branch instead of 'main'. '.' works too.
     },
     hotfix: {
-      pattern: 'hotfix/{username}-{date}',
+      pattern: 'hotfix/{username}-{desc?}-{date}',
       description: 'Create a hotfix branch',
     },
   },
@@ -154,11 +154,11 @@ const TEMPLATE_JSON = `{
       "description": "Create a release branch"
     },
     "feature": {
-      "pattern": "feature/{username}-{date}-{desc?}",
+      "pattern": "feature/{username}-{desc?}-{date}",
       "description": "Create a feature branch"
     },
     "hotfix": {
-      "pattern": "hotfix/{username}-{date}",
+      "pattern": "hotfix/{username}-{desc?}-{date}",
       "description": "Create a hotfix branch"
     }
   }

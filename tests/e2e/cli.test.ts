@@ -54,7 +54,7 @@ describe('pumpp CLI (e2e)', () => {
     const r = pumpp(dir, 'feature', '--desc', 'login', '-y', '--no-push')
     expect(r.status).toBe(0)
     const branch = git(dir, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
-    expect(branch).toMatch(/feature\/alice-\d{8}-login/)
+    expect(branch).toMatch(/feature\/alice-login-\d{8}/)
   })
 
   it('hotfix on dirty tree exits 2 with DIRTY_WORKING_TREE', () => {

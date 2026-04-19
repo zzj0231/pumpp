@@ -24,16 +24,39 @@ describe('pumpBranch', () => {
     expect(state.createdBranches).toHaveLength(0)
   })
 
-  it('feature with --desc appends when pattern lacks {desc}', async () => {
+  it('feature with --desc fills the {desc?} slot in default pattern', async () => {
     const { deps, state } = createFakeDeps()
     const r = await pumpBranch('feature', {
       config: baseConfig(),
       desc: 'login',
       yes: true,
     }, deps)
-    expect(r.branchName).toBe('feature/alice-20260418-login')
-    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-20260418-login', base: 'main', checkout: true })
+    expect(r.branchName).toBe('feature/alice-login-20260418')
+    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-login-20260418', base: 'main', checkout: true })
     expect(state.pushed).toHaveLength(0)
+  })
+
+  it('feature without --desc drops the optional {desc?} cleanly', async () => {
+    const { deps, state } = createFakeDeps()
+    const r = await pumpBranch('feature', {
+      config: baseConfig(),
+      yes: true,
+    }, deps)
+    expect(r.branchName).toBe('feature/alice-20260418')
+    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-20260418' })
+  })
+
+  it('appends --desc with separator when pattern lacks {desc}', async () => {
+    const { deps, state } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.types.feature.pattern = 'feature/{username}-{date}'
+    const r = await pumpBranch('feature', {
+      config: cfg,
+      desc: 'login',
+      yes: true,
+    }, deps)
+    expect(r.branchName).toBe('feature/alice-20260418-login')
+    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-20260418-login' })
   })
 
   it('throws UNKNOWN_BRANCH_TYPE for unknown type', async () => {

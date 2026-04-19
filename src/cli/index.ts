@@ -47,14 +47,15 @@ export async function main(argv = process.argv): Promise<void> {
       case 'interactive': {
         const deps = defaultDeps()
         const type = await pickType(config, deps)
-        const runtime = await augmentInteractive(type, config, deps, {})
+        const runtime = await maybePromptDesc(type, config, deps, {})
         await runOne(type, { ...runtime, config }, global, deps)
         return
       }
 
       case 'run': {
         const deps = defaultDeps()
-        await runOne(intent.type, { ...intent.runtime, config }, global, deps)
+        const runtime = await maybePromptDesc(intent.type, config, deps, intent.runtime)
+        await runOne(intent.type, { ...runtime, config }, global, deps)
       }
     }
   }
@@ -107,7 +108,17 @@ async function pickType(config: ResolvedPumpConfig, deps = defaultDeps()): Promi
 
 const DESC_TOKEN_RE = /\{desc\??\}/
 
-async function augmentInteractive(
+/**
+ * Ask for `{desc}` interactively when:
+ *  - the resolved pattern has the token,
+ *  - the user did not pass `--desc`,
+ *  - the user did not pass `-y/--yes`,
+ *  - and stdin is a TTY (skip silently in CI).
+ *
+ * If the user submits an empty value, warn and confirm whether to proceed
+ * without a description; on declining, ask once more (no further loops).
+ */
+async function maybePromptDesc(
   type: string,
   config: ResolvedPumpConfig,
   deps: ReturnType<typeof defaultDeps>,
@@ -116,11 +127,31 @@ async function augmentInteractive(
   const typeCfg = config.types[type]
   if (!typeCfg)
     return base
-  if (DESC_TOKEN_RE.test(typeCfg.pattern) && !base.desc) {
-    const desc = await deps.prompt.text('Description (fills {desc}):')
-    if (desc)
-      return { ...base, desc }
+  if (!DESC_TOKEN_RE.test(typeCfg.pattern))
+    return base
+  if (base.desc)
+    return base
+  if (base.yes)
+    return base
+  if (!process.stdin.isTTY)
+    return base
+
+  const first = (await deps.prompt.text('Description (fills {desc}):')).trim()
+  if (first)
+    return { ...base, desc: first }
+
+  if (!process.stdout.isTTY) {
+    console.warn(yellow('! desc is empty; branch name will fall back to the pattern default'))
+    return base
   }
+  console.warn(yellow('! desc is empty; descriptive branches make code review and history scanning much easier'))
+  const proceed = await deps.prompt.confirm('Proceed without a desc?')
+  if (proceed)
+    return base
+
+  const second = (await deps.prompt.text('Description (fills {desc}):')).trim()
+  if (second)
+    return { ...base, desc: second }
   return base
 }
 

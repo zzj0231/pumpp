@@ -82,11 +82,42 @@ pumpp hotfix --desc urgent-fix --push -y
 
 ## 3. 内置类型（默认配置）
 
-| 子命令    | 默认 pattern                     | 用途                       |
-| --------- | -------------------------------- | -------------------------- |
-| `release` | `release/{version}-{date}`       | 从 `package.json` 读版本号 |
-| `feature` | `feature/{username}-{date}`      | 按作者 + 日期              |
-| `hotfix`  | `hotfix/{username}-{date}`       | 同上；用于紧急修复         |
+| 子命令    | 默认 pattern                              | 用途                                               |
+| --------- | ----------------------------------------- | -------------------------------------------------- |
+| `release` | `release/{version}-{date}`                | 从 `package.json` 读版本号；纯机器可推导，全自动   |
+| `feature` | `feature/{username}-{desc?}-{date}`       | 按作者 + 描述 + 日期；TTY 下会主动询问 `desc`（§3.1） |
+| `hotfix`  | `hotfix/{username}-{desc?}-{date}`        | 同 feature；用于紧急修复                           |
+
+设计原则：`release` 是机器活、不打扰；`feature` / `hotfix` 是人意图、默认询问。
+
+### 3.1 feature / hotfix 的 `desc` 自动询问
+
+只要 pattern 里出现 `{desc}` 或 `{desc?}`，CLI 会按下面这张矩阵决定要不要问你：
+
+| 已传 `--desc` | `-y / --yes` | stdin 是 TTY | 行为 |
+| --- | --- | --- | --- |
+| ✅ | — | — | 不问（CLI 提供） |
+| ❌ | ✅ | — | 不问（`-y` = 信任默认；可选 token 会被清掉） |
+| ❌ | ❌ | ❌ 非 TTY (CI) | 不问；可选 → 渲染成无 desc 名；必需 → `UNRESOLVED_TOKEN` |
+| ❌ | ❌ | ✅ TTY | **弹文本 prompt** 询问 `Description (fills {desc}):` |
+
+弹 prompt 后用户输入：
+
+| 输入 | 行为 |
+| --- | --- |
+| 非空字符串 | trim 后用作 desc，继续 |
+| 空回车 | 黄字警告 `! desc is empty; descriptive branches make code review and history scanning much easier` → 弹 confirm `Proceed without a desc? [Y/n]`<br/>· **Yes**（默认） → 接受空 desc，可选 token 被清掉<br/>· **No** → 再弹一次 desc text；这次输什么就用什么（不再二次确认，避免死循环）|
+| Ctrl-C / ESC | 直接中止，`ABORTED_BY_USER`（exit 0） |
+
+行为对照例（默认 pattern + git user 是 `alice` + 当天 `20260418`）：
+
+| 命令 | TTY 下 | CI / 非 TTY 下 |
+| --- | --- | --- |
+| `pumpp feature` | 弹 desc prompt → 输 `login` → §2.1 菜单 → `feature/alice-login-20260418` | 不问，渲染 `feature/alice-20260418` → §2.1 菜单 |
+| `pumpp feature -y` | 不问、不菜单，直接 `feature/alice-20260418` | 同 |
+| `pumpp feature --desc login` | 不问 desc，菜单仍弹，结果 `feature/alice-login-20260418` | 同 |
+| `pumpp feature --desc login -y` | 静默 `feature/alice-login-20260418` | 同 |
+| `pumpp release` / `pumpp release -y` | 永远不问（pattern 不含 desc） | 同 |
 
 三类默认 `base = main`，与 spec §Q4 一致。要改 pattern / 新增类型，见 §5 配置。
 
@@ -183,11 +214,11 @@ export default definePumpConfig({
       description: 'Create a release branch',
     },
     feature: {
-      pattern: 'feature/{username}-{date}-{desc?}',
+      pattern: 'feature/{username}-{desc?}-{date}',
       requiredTokens: ['username'],
     },
     hotfix: {
-      pattern: 'hotfix/{username}-{date}',
+      pattern: 'hotfix/{username}-{desc?}-{date}',
       base: 'main',
     },
     // 自定义类型自动生成子命令 `pumpp chore`

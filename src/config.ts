@@ -11,8 +11,8 @@ export const pumpConfigDefaults: PumpInputConfig = {
   manifest: { file: 'package.json', versionKey: 'version' },
   types: {
     release: { pattern: 'release/{version}-{date}' },
-    feature: { pattern: 'feature/{username}-{date}' },
-    hotfix: { pattern: 'hotfix/{username}-{date}' },
+    feature: { pattern: 'feature/{username}-{desc?}-{date}' },
+    hotfix: { pattern: 'hotfix/{username}-{desc?}-{date}' },
   },
   tokenProviders: [],
 }

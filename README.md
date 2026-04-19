@@ -2,13 +2,14 @@
 
 > **b**ranch-**pumpp** — create convention-based git branches from manifest version and project config.
 
-`bumpp` 管版本号，`pumpp` 管分支名。按项目既定的命名规范（`release/{version}-{date}`、`feature/{username}-{date}-{desc?}` 等）一键生成并创建分支。
+`bumpp` 管版本号，`pumpp` 管分支名。按项目既定的命名规范（`release/{version}-{date}`、`feature/{username}-{desc?}-{date}` 等）一键生成并创建分支。
 
 - **零配置可用**：内置 `release` / `feature` / `hotfix` 三类；`pumpp init` 一键出脚手架
 - **配置驱动**：在 `pumpp.config.ts` 里注册任意类型，CLI 子命令自动生成
 - **模板 + token**：`{version}` / `{date}` / `{username}` / `{desc?}` 等 8 类内置 token，支持自定义
 - **可选 token**：`{desc?}` 未解析时连同分隔符一并清理
 - **友好确认菜单**：Accept / Edit / Cancel 三选；选 Edit 可在预填 buffer 里光标就位改分支名
+- **意图驱动**：`release` 全自动；`feature` / `hotfix` TTY 下默认询问 `desc`，空回车给警告 + 二次询问，CI 用 `-y` 跳过
 - **三层定制**：token provider 覆盖 / `customBranchName` 钩子 / 编程式 API，按需选
 - **Git 安全**：干净工作区检查、`git check-ref-format` 校验、同名分支探测
 - **完整 DI**：核心流水线可注入 deps，易于测试与嵌入
@@ -38,7 +39,7 @@ pumpp
 
 # 仅解析不写仓库
 pumpp feature --desc login --dry-run
-# → Dry run: feature/<user>-20260418-login
+# → Dry run: feature/<user>-login-20260418
 
 # 创建并推送
 pumpp hotfix --desc cve-fix --push -y
@@ -55,8 +56,8 @@ export default definePumpConfig({
   base: 'main',
   types: {
     release: { pattern: 'release/{version}-{date}' },
-    feature: { pattern: 'feature/{username}-{date}-{desc?}' },
-    hotfix: { pattern: 'hotfix/{username}-{date}' },
+    feature: { pattern: 'feature/{username}-{desc?}-{date}' },
+    hotfix: { pattern: 'hotfix/{username}-{desc?}-{date}' },
     chore: { pattern: 'chore/{username}-{desc}' },
   },
 })
