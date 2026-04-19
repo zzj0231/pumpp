@@ -32,6 +32,7 @@
   "scripts": {
     "lint": "eslint .",
     "build": "tsdown",
+    "release": "bumpp",
     "typecheck": "tsc --noEmit",
     "pumpp": "tsx src/cli/run.ts",
     "test": "vitest run",
