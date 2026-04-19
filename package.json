@@ -1,34 +1,53 @@
 {
   "name": "pumpp",
-  "version": "1.0.0",
+  "type": "module",
+  "version": "0.1.0",
   "packageManager": "pnpm@10.25.0",
-  "description": "",
-  "author": "",
-  "license": "ISC",
-  "keywords": [],
-  "main": "index.js",
+  "description": "Create convention-based git branches from manifest version and project config (bumpp-style CLI)",
+  "author": "sky tomos",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "branch",
+    "cli",
+    "release",
+    "workflow"
+  ],
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./cli": "./dist/cli/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.mts",
+  "bin": {
+    "pumpp": "bin/pumpp.mjs"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsdown --watch",
+    "lint": "eslint .",
     "build": "tsdown",
-    "prepublishOnly": "tsdown"
+    "typecheck": "tsc --noEmit",
+    "pumpp": "tsx src/cli/run.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "ansis": "^4.2.0",
-    "args-tokenizer": "^0.3.0",
     "c12": "^3.3.3",
     "cac": "^6.7.14",
     "escalade": "^3.2.0",
-    "giget": "^1.2.3",
     "jsonc-parser": "^3.3.1",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
     "semver": "^7.7.1",
     "tinyexec": "^1.0.2"
-
   },
   "devDependencies": {
     "@antfu/eslint-config": "^8.0.0",
@@ -40,6 +59,8 @@
     "lint-staged": "^16.2.7",
     "simple-git-hooks": "^2.13.0",
     "tsdown": "^0.21.7",
-    "typescript": "^5.9.3"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
