@@ -1,64 +1,65 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import { PumppError } from '../errors'
+import fs from "node:fs/promises";
+import path from "node:path";
+import { PumppError } from "../errors";
 
-export type InitFormat = 'ts' | 'mjs' | 'json'
+export type InitFormat = "ts" | "mjs" | "json";
 
 export interface InitOptions {
-  cwd: string
-  format: InitFormat
-  force: boolean
+  cwd: string;
+  format: InitFormat;
+  force: boolean;
 }
 
 export interface InitResult {
-  path: string
-  created: boolean
-  overwrote: boolean
+  path: string;
+  created: boolean;
+  overwrote: boolean;
 }
 
 const KNOWN_CONFIG_FILES = [
-  'pumpp.config.ts',
-  'pumpp.config.mts',
-  'pumpp.config.mjs',
-  'pumpp.config.cjs',
-  'pumpp.config.js',
-  'pumpp.config.json',
-]
+  "pumpp.config.ts",
+  "pumpp.config.mts",
+  "pumpp.config.mjs",
+  "pumpp.config.cjs",
+  "pumpp.config.js",
+  "pumpp.config.json",
+];
 
 export async function runInit(opts: InitOptions): Promise<InitResult> {
-  const filename = `pumpp.config.${opts.format}`
-  const target = path.resolve(opts.cwd, filename)
+  const filename = `pumpp.config.${opts.format}`;
+  const target = path.resolve(opts.cwd, filename);
 
-  const existing = await findExisting(opts.cwd)
+  const existing = await findExisting(opts.cwd);
   if (existing && !opts.force) {
     throw new PumppError(`Found existing ${path.basename(existing)}`, {
-      code: 'INVALID_ARGUMENT',
-      hint: 'Pass --force to overwrite, or delete the file manually',
-    })
+      code: "INVALID_ARGUMENT",
+      hint: "Pass --force to overwrite, or delete the file manually",
+    });
   }
 
-  await fs.writeFile(target, buildTemplate(opts.format), 'utf8')
+  await fs.writeFile(target, buildTemplate(opts.format), "utf8");
 
   return {
     path: target,
     created: !existing,
     overwrote: Boolean(existing),
-  }
+  };
 }
 
 async function findExisting(cwd: string): Promise<string | undefined> {
   for (const name of KNOWN_CONFIG_FILES) {
-    const p = path.resolve(cwd, name)
+    const p = path.resolve(cwd, name);
     try {
-      await fs.access(p)
-      return p
+      await fs.access(p);
+      return p;
+    } catch {
+      /* not found */
     }
-    catch { /* not found */ }
   }
-  return undefined
+  return undefined;
 }
 
-const TEMPLATE_TS = `import { definePumpConfig } from 'pumpp'
+const TEMPLATE_TS = `import { definePumpConfig } from 'pumpp-cli'
 
 export default definePumpConfig({
   base: 'main',
@@ -102,9 +103,9 @@ export default definePumpConfig({
   //     return ctx.branchName.replace(/^release\\//, 'prerelease/')
   // },
 })
-`
+`;
 
-const TEMPLATE_MJS = `/** @type {import('pumpp').PumpInputConfig} */
+const TEMPLATE_MJS = `/** @type {import('pumpp-cli').PumpInputConfig} */
 export default {
   base: 'main',
   remote: 'origin',
@@ -139,7 +140,7 @@ export default {
   //     return ctx.branchName.replace(/^release\\//, 'prerelease/')
   // },
 }
-`
+`;
 
 const TEMPLATE_JSON = `{
   "base": "main",
@@ -163,15 +164,15 @@ const TEMPLATE_JSON = `{
     }
   }
 }
-`
+`;
 
 export function buildTemplate(format: InitFormat): string {
   switch (format) {
-    case 'ts':
-      return TEMPLATE_TS
-    case 'mjs':
-      return TEMPLATE_MJS
-    case 'json':
-      return TEMPLATE_JSON
+    case "ts":
+      return TEMPLATE_TS;
+    case "mjs":
+      return TEMPLATE_MJS;
+    case "json":
+      return TEMPLATE_JSON;
   }
 }

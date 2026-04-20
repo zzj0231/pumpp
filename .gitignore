@@ -2,7 +2,6 @@ node_modules
 dist
 .DS_Store
 .npmrc
-.vscode
 .cursor
 .git/COMMIT_MSG_TMP.txt
 .git/tmp_tree.txt
