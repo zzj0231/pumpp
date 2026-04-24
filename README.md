@@ -7,15 +7,15 @@
 适合这类场景：
 
 - 发布分支需要固定带版本号和日期
-- `feature` / `hotfix` 分支想统一带作者、描述、日期
+- `feature` / `hotfix` 分支想统一带作者、描述等（可在 pattern 中自行加入 `{date}` 等 token）
 - 团队想减少手动命名出错，统一分支规范
 - 本地开发和 CI 希望共用同一套规则
 
 ## 特性
 
-- **开箱即用**：内置 `release`、`feature`、`hotfix` 三种类型
+- **开箱即用**：默认提供 `release`、`feature`、`hotfix`、`style` 等类型
 - **配置驱动**：在 `pumpp.config.ts` 里新增类型，CLI 会自动生成对应子命令
-- **模板 + token**：支持 `{version}`、`{date}`、`{username}`、`{desc?}` 等内置 token，也支持自定义
+- **模板 + token**：见下文「[内置 token](#内置-token)」；也支持在配置里增加自定义 `tokenProviders`
 - **可选 token 自动清理**：例如 `{desc?}` 为空时，会连同多余分隔符一起移除
 - **交互友好**：生成后可选择 `Accept`、`Edit`、`Cancel`
 - **Git 安全检查**：支持工作区检查、分支名校验、同名分支探测
@@ -50,11 +50,33 @@ pumpp feature --desc login --dry-run
 pumpp hotfix --desc cve-fix --push -y
 ```
 
-默认规则如下：
+默认规则（与 `src/config.ts` 中 `pumpConfigDefaults` 一致）如下：
 
 - `release`: `release/{version}-{date}`
-- `feature`: `feature/{username}-{desc?}-{date}`
-- `hotfix`: `hotfix/{username}-{desc?}-{date}`
+- `feature`: `feature/{username}-{desc?}`
+- `hotfix`: `hotfix/{username}-{desc?}`
+- `style`: `style({module})/{username}-{desc}`（`{module}` 由配置里随附的 `module` token provider 提供，**不是**下表中的内置解析器，见后文「预置的 `module`」）
+
+## 内置 token
+
+下列 token 由库内建的 `buildBuiltinProviders()` 提供，写在模板的 `{token}` 中即可。可选占位符的写法是 `{name?}`，含义见上文「可选 token 自动清理」。
+
+| Token | 来源 / 行为 |
+|--------|-------------|
+| `version` | 从 manifest 读版本（默认 `package.json` 的 `version`，可用 `--file` / `--version-key` 与全局 `manifest` 配置覆盖）。用于分支名时**不**做 slug 化，与 manifest 中字符串一致。 |
+| `major` / `minor` / `patch` | 在 `version` 可解析为 SemVer 时，分别取主/次/修订号；**依赖**同次解析中已得到的 `version`。不 slug 化。 |
+| `date` | 无 `--date` 时取当天 **YYYYMMDD**；有 `--date` 时按 CLI 规则校验。不 slug 化。 |
+| `year` / `month` / `day` | 在已有 `date` 时从 `YYYYMMDD` 拆出；**依赖** `date`。不 slug 化。 |
+| `username` | 优先 `git config user.name`，否则 `USER` / `USERNAME` 等，再本机用户名；**经过 slug 化**（小写、空白与符号折叠）。 |
+| `desc` | 来自 `--desc` 或交互输入；`interactive: true`。**经过 slug 化**。 |
+| `branch` | 当前 Git 分支名；**经过 slug 化**。 |
+| `random` | 6 位十六进制随机串，用于模板时保持字面，不额外 slug 化。 |
+
+在任意 pattern 中未以 `{name}` 或 `{name?}` 形式出现的 token **不会**被解析。若希望某个 token 在「pattern 里写成可选」之外仍被强制要求，请在该类型的 `requiredTokens` 中声明（见 `docs/usage.md` 或类型定义）。
+
+### 预置的 `module`（与内置 token 不同）
+
+`pumpp` 的默认 `types.style` 使用 `{module}`。这不是上表内建解析器，而是 **默认配置**里附带的一条 `tokenProviders` 项：通常声明 `name: 'module'`，`interactive: true`，`resolve` 可省略。`pumpp init` 会生成等价的样例。若你自定义 `types` 或覆盖 `tokenProviders`，需要自行为 `{module}`（或其它自定义名）补全 provider 定义。
 
 ## 配置示例
 
@@ -67,10 +89,12 @@ export default definePumpConfig({
   base: 'main',
   types: {
     release: { pattern: 'release/{version}-{date}' },
-    feature: { pattern: 'feature/{username}-{desc?}-{date}' },
-    hotfix: { pattern: 'hotfix/{username}-{desc?}-{date}' },
+    feature: { pattern: 'feature/{username}-{desc?}' },
+    hotfix: { pattern: 'hotfix/{username}-{desc?}' },
+    style: { pattern: 'style({module})/{username}-{desc}' },
     chore: { pattern: 'chore/{username}-{desc}' },
   },
+  tokenProviders: [{ name: 'module', interactive: true }],
 })
 ```
 
