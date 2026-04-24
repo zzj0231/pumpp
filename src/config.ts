@@ -1,18 +1,24 @@
-import type { PumpInputConfig } from './type/pump-config'
+import type { PumpInputConfig } from "./type/pump-config";
 
 export const pumpConfigDefaults: PumpInputConfig = {
-  base: 'main',
+  base: "main",
   push: false,
   checkout: true,
   confirm: true,
   gitCheck: true,
   fetch: false,
-  remote: 'origin',
-  manifest: { file: 'package.json', versionKey: 'version' },
+  remote: "origin",
+  manifest: { file: "package.json", versionKey: "version" },
   types: {
-    release: { pattern: 'release/{version}-{date}' },
-    feature: { pattern: 'feature/{username}-{desc?}-{date}' },
-    hotfix: { pattern: 'hotfix/{username}-{desc?}-{date}' },
+    release: { pattern: "release/{version}-{date}" },
+    feature: { pattern: "feature/{username}-{desc?}-{date}" },
+    hotfix: { pattern: "hotfix/{username}-{desc?}-{date}" },
+    style: { pattern: "style({module})/{username}-{desc}" },
   },
-  tokenProviders: [],
-}
+  tokenProviders: [
+    {
+      name: "module",
+      interactive: true,
+    },
+  ],
+};

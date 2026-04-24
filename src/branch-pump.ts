@@ -3,6 +3,7 @@ import type { PumpBranchResults } from './type/pump-branch-results'
 import type { ResolvedPumpConfig, ResolvedTypeConfig } from './type/pump-config'
 import type { PumpDeps } from './type/pump-deps'
 import type { PumpRuntimeOptions } from './type/pump-runtime-options'
+import type { MissingTokenSpec, ResolvedTokenState } from './type/token-provider'
 import process from 'node:process'
 import { defaultDeps } from './default-deps'
 import { PumppError, toPumppError } from './errors'
@@ -10,7 +11,7 @@ import { loadPumpConfig } from './load-pump-config'
 import { ProgressEvent } from './type/pump-branch-progress'
 import { renderBranchName } from './utils/branch-template'
 import { slugifyBranchToken } from './utils/slug'
-import { resolveTokens } from './utils/token-providers'
+import { resolveTokenState } from './utils/token-providers'
 import { validateRef } from './utils/validate-ref'
 
 const DESC_TOKEN_RE = /\{desc\??\}/
@@ -20,17 +21,20 @@ export interface PreviewBranchResult {
   pattern: string
   branchName: string
   tokens: Record<string, string>
+  missing: MissingTokenSpec[]
   /**
-   * Cheap synchronous re-render with a different `desc` value.
+   * Cheap synchronous re-render with patched token values.
    *
-   * Reuses pre-resolved tokens (no extra git / manifest IO), slugs the input,
-   * and mirrors the same "fill {desc?} slot OR append after-the-fact" logic
-   * `pumpBranch` uses. Note: `customBranchName` hooks are NOT applied here —
-   * keystroke handlers cannot await arbitrary user code. The returned
-   * `branchName` field above DOES include hook output for the initial empty
-   * desc, so live previews stay close to the final result for typical configs.
+   * Reuses pre-resolved tokens (no extra git / manifest IO), slugs patch
+   * values, and mirrors the same rendering logic `pumpBranch` uses, except
+   * empty optional pattern tokens (e.g. `{desc?}`) are shown as literals here so
+   * interactive previews match the template. Note: `customBranchName` hooks
+   * are NOT applied here — keystroke handlers cannot await arbitrary user
+   * code. The returned `branchName` field above DOES include hook output for
+   * the initial render, so live previews stay close to the final result for
+   * typical configs.
    */
-  renderWith: (desc?: string) => string
+  renderWith: (patch: Record<string, string | undefined>) => string
 }
 
 export async function pumpBranch(
@@ -51,7 +55,12 @@ async function runPipeline(
   runtime: PumpRuntimeOptions,
   deps: PumpDeps,
 ): Promise<PumpBranchResults> {
-  const { cwd, config, typeConfig, sluggedTokens, branchName: rendered } = await resolveAndRender(type, runtime, deps)
+  const { cwd, config, typeConfig, sluggedTokens } = await resolveBranchRenderContext(
+    type,
+    runtime,
+    deps,
+    false,
+  )
 
   const effective = mergeEffective(typeConfig, config, runtime)
   if (isHeadAlias(effective.base))
@@ -60,7 +69,15 @@ async function runPipeline(
   emit(runtime, { event: ProgressEvent.ConfigLoaded, type, base: effective.base, branchName: '', dryRun })
   emit(runtime, { event: ProgressEvent.TokensResolved, type, base: effective.base, branchName: '', dryRun })
 
-  let branchName = rendered
+  let branchName = renderResolvedBranchName(
+    typeConfig.pattern,
+    sluggedTokens,
+    runtime.desc ? { desc: runtime.desc } : {},
+  )
+  const renderTokens = mergeResolvedTokens(
+    sluggedTokens,
+    runtime.desc ? { desc: runtime.desc } : {},
+  )
 
   const hook = runtime.customBranchName
     ?? typeConfig.customBranchName
@@ -69,7 +86,7 @@ async function runPipeline(
     const override = await hook({
       type,
       pattern: typeConfig.pattern,
-      tokens: sluggedTokens,
+      tokens: renderTokens,
       typeConfig,
     })
     if (typeof override === 'string' && override.trim())
@@ -119,14 +136,15 @@ interface ResolveAndRenderResult {
   cwd: string
   config: ResolvedPumpConfig
   typeConfig: ResolvedTypeConfig
+  tokenState: ResolvedTokenState
   sluggedTokens: Record<string, string>
-  branchName: string
 }
 
-async function resolveAndRender(
+async function resolveBranchRenderContext(
   type: string,
   runtime: PumpRuntimeOptions,
   deps: PumpDeps,
+  allowInteractiveMissing: boolean,
 ): Promise<ResolveAndRenderResult> {
   const cwd = runtime.cwd ?? process.cwd()
   const config = runtime.config ?? await loadPumpConfig(cwd, runtime.configFile)
@@ -138,7 +156,7 @@ async function resolveAndRender(
     })
   }
 
-  const tokens = await resolveTokens({
+  const tokenState = await resolveTokenState({
     pattern: typeConfig.pattern,
     providers: config.tokenProviders,
     ctx: {
@@ -150,25 +168,73 @@ async function resolveAndRender(
       tokens: {},
     },
     deps,
+    allowInteractiveMissing,
   })
-  const sluggedTokens = slugValues(tokens)
+  const sluggedTokens = slugValues(tokenState.values)
 
-  let branchName = renderBranchName(typeConfig.pattern, sluggedTokens)
-  if (runtime.desc && !DESC_TOKEN_RE.test(typeConfig.pattern))
-    branchName = `${branchName}-${slugifyBranchToken(runtime.desc)}`
+  return { cwd, config, typeConfig, tokenState, sluggedTokens }
+}
 
-  return { cwd, config, typeConfig, sluggedTokens, branchName }
+function normalizePatchedTokens(
+  patch: Record<string, string | undefined> = {},
+): Record<string, string | undefined> {
+  const normalized: Record<string, string | undefined> = {}
+
+  for (const [name, value] of Object.entries(patch)) {
+    const trimmed = value?.trim()
+    if (!trimmed) {
+      normalized[name] = undefined
+      continue
+    }
+
+    normalized[name] = shouldPreserveTokenLiteral(name)
+      ? trimmed
+      : slugifyBranchToken(trimmed, trimmed)
+  }
+
+  return normalized
+}
+
+function mergeResolvedTokens(
+  baseTokens: Record<string, string>,
+  patch: Record<string, string | undefined> = {},
+): Record<string, string> {
+  const merged = { ...baseTokens }
+
+  for (const [name, value] of Object.entries(normalizePatchedTokens(patch))) {
+    if (value === undefined)
+      delete merged[name]
+    else
+      merged[name] = value
+  }
+
+  return merged
+}
+
+function renderResolvedBranchName(
+  pattern: string,
+  baseTokens: Record<string, string>,
+  patch: Record<string, string | undefined> = {},
+  templateOpts?: { showEmptyOptionalPlaceholders?: boolean },
+): string {
+  const merged = mergeResolvedTokens(baseTokens, patch)
+  const rendered = renderBranchName(pattern, merged, templateOpts)
+  const desc = merged.desc?.trim()
+
+  if (desc && !DESC_TOKEN_RE.test(pattern))
+    return `${rendered}-${desc}`
+
+  return rendered
 }
 
 /**
  * Preview the branch name without touching the working tree, remote, or running
  * the `customBranchName` hook on every keystroke.
  *
- * Resolves config + tokens once, then returns a synchronous `renderWith(desc)`
- * closure that the CLI uses to drive the live preview line under the desc
- * input. Token resolution still runs (so version / username / git read happen),
- * but git mutation, preflight, and the (potentially async) custom hook are
- * skipped on every re-render.
+ * Resolves config + tokens once, then returns a synchronous `renderWith(patch)`
+ * closure that the CLI can use to drive live previews. Token resolution still
+ * runs (so version / username / git read happen), but git mutation, preflight,
+ * and the (potentially async) custom hook are skipped on every re-render.
  */
 export async function previewBranchName(
   type: string,
@@ -176,29 +242,21 @@ export async function previewBranchName(
   deps: PumpDeps = defaultDeps(),
 ): Promise<PreviewBranchResult> {
   const baseRuntime: PumpRuntimeOptions = { ...runtime, desc: undefined }
-  const { config, typeConfig, sluggedTokens } = await resolveAndRender(
+  const { config, typeConfig, tokenState, sluggedTokens } = await resolveBranchRenderContext(
     type,
     baseRuntime,
     deps,
+    true,
   )
 
   const pattern = typeConfig.pattern
-  const hasDescSlot = DESC_TOKEN_RE.test(pattern)
+  const initialPatch = runtime.desc ? { desc: runtime.desc } : {}
+  const seededTokens = mergeResolvedTokens(sluggedTokens, initialPatch)
+  const seededMissing = tokenState.missing.filter(item => seededTokens[item.name] === undefined)
+  const renderWith = (patch: Record<string, string | undefined> = {}): string =>
+    renderResolvedBranchName(pattern, seededTokens, patch, { showEmptyOptionalPlaceholders: true })
 
-  const renderWith = (desc?: string): string => {
-    const trimmed = desc?.trim() ?? ''
-    if (!trimmed) {
-      const tokens = { ...sluggedTokens }
-      delete tokens.desc
-      return renderBranchName(pattern, tokens)
-    }
-    const slug = slugifyBranchToken(trimmed)
-    const tokens = { ...sluggedTokens, desc: slug }
-    const name = renderBranchName(pattern, tokens)
-    return hasDescSlot ? name : `${name}-${slug}`
-  }
-
-  let branchName = renderWith(runtime.desc)
+  let branchName = renderWith()
   const hook = runtime.customBranchName
     ?? typeConfig.customBranchName
     ?? config.customBranchName
@@ -206,7 +264,7 @@ export async function previewBranchName(
     const override = await hook({
       type,
       pattern,
-      tokens: sluggedTokens,
+      tokens: seededTokens,
       typeConfig,
     })
     if (typeof override === 'string' && override.trim())
@@ -217,7 +275,8 @@ export async function previewBranchName(
     type,
     pattern,
     branchName,
-    tokens: sluggedTokens,
+    tokens: seededTokens,
+    missing: seededMissing,
     renderWith,
   }
 }
@@ -251,12 +310,21 @@ function mergeEffective(
 function slugValues(tokens: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(tokens)) {
-    if (k === 'version' || k === 'date' || k === 'year' || k === 'month' || k === 'day' || k === 'random')
+    if (shouldPreserveTokenLiteral(k))
       out[k] = v
     else
       out[k] = slugifyBranchToken(v, v)
   }
   return out
+}
+
+function shouldPreserveTokenLiteral(name: string): boolean {
+  return name === 'version'
+    || name === 'date'
+    || name === 'year'
+    || name === 'month'
+    || name === 'day'
+    || name === 'random'
 }
 
 async function preflight(

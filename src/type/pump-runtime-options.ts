@@ -16,6 +16,7 @@ export interface PumpRuntimeOptions {
   base?: string
   date?: string
   desc?: string
+  interactiveTokens?: Record<string, string>
   yes?: boolean
   dryRun?: boolean
   push?: boolean

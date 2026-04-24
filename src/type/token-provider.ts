@@ -10,8 +10,20 @@ export interface TokenContext {
   tokens: Record<string, string>
 }
 
+export interface MissingTokenSpec {
+  name: string
+  optional: boolean
+  interactive: boolean
+}
+
+export interface ResolvedTokenState {
+  values: Record<string, string>
+  missing: MissingTokenSpec[]
+}
+
 export interface TokenProviderSpec {
   name: string
   dependsOn?: string[]
-  resolve: (ctx: TokenContext) => Promise<string | undefined> | string | undefined
+  interactive?: boolean
+  resolve?: (ctx: TokenContext) => Promise<string | undefined> | string | undefined
 }

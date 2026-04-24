@@ -1,5 +1,5 @@
 import type { PumpDeps } from '../type/pump-deps'
-import type { TokenContext, TokenProviderSpec } from '../type/token-provider'
+import type { MissingTokenSpec, ResolvedTokenState, TokenContext, TokenProviderSpec } from '../type/token-provider'
 import os from 'node:os'
 import process from 'node:process'
 import { parse as parseSemver } from 'semver'
@@ -19,7 +19,7 @@ export function buildBuiltinProviders(): TokenProviderSpec[] {
     { name: 'month', dependsOn: ['date'], resolve: ctx => ctx.tokens.date ? splitYmd(ctx.tokens.date).month : undefined },
     { name: 'day', dependsOn: ['date'], resolve: ctx => ctx.tokens.date ? splitYmd(ctx.tokens.date).day : undefined },
     { name: 'username', resolve: usernameResolve },
-    { name: 'desc', resolve: ctx => ctx.runtime.desc?.trim() || undefined },
+    { name: 'desc', interactive: true, resolve: ctx => ctx.runtime.desc?.trim() || undefined },
     { name: 'branch', resolve: branchResolve },
     { name: 'random', resolve: () => Math.random().toString(16).slice(2, 8) },
   ]
@@ -83,10 +83,23 @@ export interface ResolveTokensArgs {
   providers: TokenProviderSpec[]
   ctx: TokenContext
   deps: PumpDeps
+  allowInteractiveMissing?: boolean
 }
 
-function topoSort(providers: TokenProviderSpec[]): TokenProviderSpec[] {
-  const map = new Map(providers.map(p => [p.name, p]))
+function buildProviderMap(providers: TokenProviderSpec[]): Map<string, TokenProviderSpec> {
+  const map = new Map<string, TokenProviderSpec>()
+  for (const provider of providers) {
+    if (map.has(provider.name)) {
+      throw new PumppError(`Duplicate token provider name "${provider.name}"`, {
+        code: 'CONFIG_INVALID',
+      })
+    }
+    map.set(provider.name, provider)
+  }
+  return map
+}
+
+function topoSort(providers: TokenProviderSpec[], map: Map<string, TokenProviderSpec>): TokenProviderSpec[] {
   const visited = new Set<string>()
   const temp = new Set<string>()
   const out: TokenProviderSpec[] = []
@@ -99,8 +112,12 @@ function topoSort(providers: TokenProviderSpec[]): TokenProviderSpec[] {
     temp.add(p.name)
     for (const dep of p.dependsOn ?? []) {
       const d = map.get(dep)
-      if (d)
-        visit(d)
+      if (!d) {
+        throw new PumppError(`Token provider "${p.name}" depends on unknown provider "${dep}"`, {
+          code: 'CONFIG_INVALID',
+        })
+      }
+      visit(d)
     }
     temp.delete(p.name)
     visited.add(p.name)
@@ -110,7 +127,7 @@ function topoSort(providers: TokenProviderSpec[]): TokenProviderSpec[] {
   return out
 }
 
-export async function resolveTokens(args: ResolveTokensArgs): Promise<Record<string, string>> {
+export async function resolveTokenState(args: ResolveTokensArgs): Promise<ResolvedTokenState> {
   const { pattern, providers, ctx: baseCtx, deps } = args
   const refs = scanPattern(pattern)
   const required = new Set<string>(baseCtx.typeConfig.requiredTokens ?? [])
@@ -121,37 +138,84 @@ export async function resolveTokens(args: ResolveTokensArgs): Promise<Record<str
       needed.set(r, false)
   }
 
-  const providerByName = new Map(providers.map(p => [p.name, p]))
-  const ordered = topoSort(providers)
-  const ctx = attachDeps({ ...baseCtx, tokens: { ...baseCtx.tokens } }, deps)
+  const providerByName = buildProviderMap(providers)
+  const ordered = topoSort(providers, providerByName)
+  const executable = collectExecutableProviders(needed, providerByName)
+  const ctx = attachDeps({
+    ...baseCtx,
+    tokens: {
+      ...baseCtx.tokens,
+      ...(baseCtx.runtime.interactiveTokens ?? {}),
+    },
+  }, deps)
 
   for (const p of ordered) {
-    if (!needed.has(p.name) && !anyDependent(p.name, needed, providers))
+    if (!executable.has(p.name))
+      continue
+    if (ctx.tokens[p.name] !== undefined)
+      continue
+    if (!p.resolve)
       continue
     const v = await p.resolve(ctx)
     if (v !== undefined && v !== '')
       ctx.tokens[p.name] = String(v)
   }
 
+  const missing: MissingTokenSpec[] = []
   for (const [name, optional] of needed) {
-    if (ctx.tokens[name] === undefined && !optional) {
-      if (!providerByName.has(name)) {
+    if (ctx.tokens[name] !== undefined)
+      continue
+
+    const provider = providerByName.get(name)
+    if (!provider) {
+      if (!optional) {
         throw new PumppError(`No provider registered for required token "${name}"`, {
           code: 'UNRESOLVED_TOKEN',
           hint: `Add a tokenProvider named "${name}" or remove {${name}} from the pattern`,
         })
       }
-      throw new PumppError(`Failed to resolve required token "${name}"`, { code: 'UNRESOLVED_TOKEN' })
+      missing.push({ name, optional, interactive: false })
+      continue
     }
+
+    const interactive = provider.interactive === true
+    if (!optional && !(interactive && args.allowInteractiveMissing)) {
+      throw new PumppError(`Failed to resolve required token "${name}"`, {
+        code: 'UNRESOLVED_TOKEN',
+        hint: interactive
+          ? `Token "${name}" is interactive. In non-interactive mode without a TTY, provide explicit input before running again.`
+          : undefined,
+      })
+    }
+
+    missing.push({ name, optional, interactive })
   }
 
-  return ctx.tokens
+  return { values: ctx.tokens, missing }
 }
 
-function anyDependent(name: string, needed: Map<string, boolean>, providers: TokenProviderSpec[]): boolean {
-  for (const p of providers) {
-    if (p.dependsOn?.includes(name) && needed.has(p.name))
-      return true
+export async function resolveTokens(args: ResolveTokensArgs): Promise<Record<string, string>> {
+  return (await resolveTokenState(args)).values
+}
+
+function collectExecutableProviders(needed: Map<string, boolean>, providerByName: Map<string, TokenProviderSpec>): Set<string> {
+  const executable = new Set<string>()
+
+  function include(name: string) {
+    if (executable.has(name))
+      return
+
+    const provider = providerByName.get(name)
+    if (!provider)
+      return
+
+    executable.add(name)
+    for (const dep of provider.dependsOn ?? [])
+      include(dep)
   }
-  return false
+
+  for (const name of needed.keys())
+    include(name)
+
+  return executable
 }

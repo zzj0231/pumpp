@@ -57,6 +57,37 @@ describe('pumpp CLI (e2e)', () => {
     expect(branch).toMatch(/feature\/alice-login-\d{8}/)
   })
 
+  it('non-interactive custom interactive token exits 1 with guidance', () => {
+    writeFileSync(path.join(dir, 'pumpp.config.ts'), `
+export default {
+  types: {
+    style: {
+      pattern: 'style({module})/{username}-{desc?}',
+    },
+  },
+  tokenProviders: [
+    {
+      name: 'module',
+      interactive: true,
+      resolve: () => process.env.BRANCH_MODULE,
+    },
+  ],
+}
+`)
+
+    const env = { ...process.env }
+    delete env.BRANCH_MODULE
+    const proc = spawnSync(process.execPath, [cli, 'style', '-y', '--no-push'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env,
+    })
+    const r = { status: proc.status ?? -1, stdout: proc.stdout, stderr: proc.stderr }
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/module/i)
+    expect(r.stderr).toMatch(/interactive|TTY|explicit input/i)
+  })
+
   it('hotfix on dirty tree exits 2 with DIRTY_WORKING_TREE', () => {
     writeFileSync(path.join(dir, 'dirty.txt'), 'x')
     const r = pumpp(dir, 'hotfix', '-y', '--no-push')

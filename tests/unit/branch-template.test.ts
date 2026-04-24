@@ -52,4 +52,13 @@ describe('renderBranchName', () => {
   it('collapses duplicated dashes after drop', () => {
     expect(renderBranchName('a-{x?}-b', {})).toBe('a-b')
   })
+  it('can show empty optional token literals (preview / docs only)', () => {
+    expect(
+      renderBranchName(
+        'style({module})/{username}-{desc?}',
+        { module: 'layout', username: 'alice' },
+        { showEmptyOptionalPlaceholders: true },
+      ),
+    ).toBe('style(layout)/alice-{desc?}')
+  })
 })

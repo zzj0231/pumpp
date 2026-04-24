@@ -46,6 +46,28 @@ describe('pumpBranch', () => {
     expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-20260418' })
   })
 
+  it('uses runtime interactiveTokens for final custom-token rendering', async () => {
+    const { deps, state } = createFakeDeps()
+    const cfg = baseConfig()
+    cfg.types.style = {
+      ...cfg.types.feature,
+      name: 'style',
+      pattern: 'style({module})/{username}-{date}',
+    }
+    cfg.tokenProviders = mergeTokenProviders(cfg.tokenProviders, [
+      { name: 'module', interactive: true, resolve: () => undefined },
+    ])
+
+    const r = await pumpBranch('style', {
+      config: cfg,
+      yes: true,
+      interactiveTokens: { module: 'layout' },
+    }, deps)
+
+    expect(r.branchName).toBe('style(layout)/alice-20260418')
+    expect(state.createdBranches[0]).toMatchObject({ name: 'style(layout)/alice-20260418' })
+  })
+
   it('appends --desc with separator when pattern lacks {desc}', async () => {
     const { deps, state } = createFakeDeps()
     const cfg = baseConfig()
@@ -183,6 +205,22 @@ describe('pumpBranch', () => {
     expect(r.branchName).toBe('release/runtime-wins')
   })
 
+  it('passes seeded desc tokens to customBranchName during final rendering', async () => {
+    const { deps } = createFakeDeps()
+    let seenDesc: string | undefined
+    const r = await pumpBranch('feature', {
+      config: baseConfig(),
+      yes: true,
+      desc: 'login',
+      customBranchName: (ctx) => {
+        seenDesc = ctx.tokens.desc
+        return `feature/hook-${ctx.tokens.desc}`
+      },
+    }, deps)
+    expect(seenDesc).toBe('login')
+    expect(r.branchName).toBe('feature/hook-login')
+  })
+
   it('progress events fire in order', async () => {
     const { deps } = createFakeDeps()
     const events: string[] = []
@@ -257,20 +295,20 @@ describe('pumpBranch', () => {
 })
 
 describe('previewBranchName', () => {
-  it('renders the optional {desc?} slot empty by default', async () => {
+  it('preview shows {desc?} placeholder when the slot is still empty', async () => {
     const { deps } = createFakeDeps()
     const p = await previewBranchName('feature', { config: baseConfig() }, deps)
     expect(p.type).toBe('feature')
     expect(p.pattern).toBe('feature/{username}-{desc?}-{date}')
-    expect(p.branchName).toBe('feature/alice-20260418')
+    expect(p.branchName).toBe('feature/alice-{desc?}-20260418')
   })
 
   it('renderWith() slugs and fills {desc?} on demand without re-resolving tokens', async () => {
     const { deps } = createFakeDeps()
     const p = await previewBranchName('feature', { config: baseConfig() }, deps)
-    expect(p.renderWith('Fix Login Bug')).toBe('feature/alice-fix-login-bug-20260418')
-    expect(p.renderWith('  ')).toBe('feature/alice-20260418')
-    expect(p.renderWith()).toBe('feature/alice-20260418')
+    expect(p.renderWith({ desc: 'Fix Login Bug' })).toBe('feature/alice-fix-login-bug-20260418')
+    expect(p.renderWith({ desc: '  ' })).toBe('feature/alice-{desc?}-20260418')
+    expect(p.renderWith({})).toBe('feature/alice-{desc?}-20260418')
   })
 
   it('appends desc with separator when pattern has no {desc} slot', async () => {
@@ -278,8 +316,8 @@ describe('previewBranchName', () => {
     const cfg = baseConfig()
     cfg.types.feature.pattern = 'feature/{username}-{date}'
     const p = await previewBranchName('feature', { config: cfg }, deps)
-    expect(p.renderWith('login')).toBe('feature/alice-20260418-login')
-    expect(p.renderWith('')).toBe('feature/alice-20260418')
+    expect(p.renderWith({ desc: 'login' })).toBe('feature/alice-20260418-login')
+    expect(p.renderWith({ desc: '' })).toBe('feature/alice-20260418')
   })
 
   it('runs customBranchName hook for the initial branchName but not in renderWith', async () => {
@@ -288,7 +326,7 @@ describe('previewBranchName', () => {
     cfg.customBranchName = ctx => `${ctx.type}/hooked-${ctx.tokens.username}`
     const p = await previewBranchName('feature', { config: cfg }, deps)
     expect(p.branchName).toBe('feature/hooked-alice')
-    expect(p.renderWith('login')).toBe('feature/alice-login-20260418')
+    expect(p.renderWith({ desc: 'login' })).toBe('feature/alice-login-20260418')
   })
 
   it('throws UNKNOWN_BRANCH_TYPE for unknown type', async () => {

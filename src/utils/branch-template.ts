@@ -27,9 +27,18 @@ function isSep(ch: string): boolean {
   return SEPARATORS.includes(ch)
 }
 
+export interface RenderBranchNameOptions {
+  /**
+   * When set, empty optional tokens (e.g. `{desc?}`) render as their pattern
+   * literal instead of being stripped. Real branch names should omit this.
+   */
+  showEmptyOptionalPlaceholders?: boolean
+}
+
 export function renderBranchName(
   pattern: string,
   values: Record<string, string | undefined>,
+  options?: RenderBranchNameOptions,
 ): string {
   let out = ''
   let i = 0
@@ -49,6 +58,9 @@ export function renderBranchName(
       out += v
     }
     else if (!optional) {
+      out += whole
+    }
+    else if (options?.showEmptyOptionalPlaceholders) {
       out += whole
     }
     else {

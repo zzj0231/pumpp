@@ -94,6 +94,33 @@ export default definePumpConfig({
 })
 ```
 
+如果这个 token 可能需要用户补充输入，可以把 provider 标记为 `interactive: true`：
+
+```ts
+import { definePumpConfig } from 'pumpp-cli'
+
+export default definePumpConfig({
+  types: {
+    style: { pattern: 'style({module})/{username}-{desc?}' },
+  },
+  tokenProviders: [
+    {
+      name: 'module',
+      interactive: true,
+      resolve: () => process.env.BRANCH_MODULE?.toLowerCase(),
+    },
+  ],
+})
+```
+
+行为说明：
+
+- 当 `resolve()` 返回了值，CLI 直接使用该值渲染分支名
+- 当 `resolve()` 没有返回值时，交互模式下 CLI 会提示你补全这个 token
+- 如果当前是非交互模式（例如 `-y`、无 TTY、CI 等）且这个 token 仍然是必填的，那么 CLI 会报错，而不会静默跳过
+
+上面的 `style({module})/{username}-{desc?}` 例子里，`{module}` 是必填 token；如果 `BRANCH_MODULE` 没有提供，交互模式会先提示输入 `module`，随后再按 pattern 顺序处理可交互 token。因为 `{desc?}` 是可选 token，CLI 也会提示输入它，但允许留空。
+
 ## 自定义最终分支名
 
 如果模板还不够，可以用 `customBranchName` 在最终输出前做一次变换：
