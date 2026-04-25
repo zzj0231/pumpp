@@ -12,10 +12,10 @@
 
 ```bash
 # 项目本地依赖
-pnpm add -D pumpp
+pnpm add -D pumpp-cli
 
 # 或全局
-pnpm add -g pumpp
+pnpm add -g pumpp-cli
 ```
 
 需要 Node.js `>= 18`。
@@ -36,7 +36,7 @@ pnpm add -g pumpp
 
 ## 2. 快速开始
 
-零配置即可用（内置 `release / feature / hotfix` 三类）：
+不写配置也能直接用。内置三类分支：`release`、`feature`、`hotfix`。
 
 ```bash
 # 一步生成 pumpp.config.ts 脚手架（可选；零配置也能跑）
@@ -51,7 +51,7 @@ pumpp
 
 # 只解析分支名，不跑 git
 pumpp feature --desc login --dry-run
-# → Dry run: feature/<user>-20260418-login
+# → Dry run: feature/<user>-login
 
 # 跳过提示直接创建并推送
 pumpp hotfix --desc urgent-fix --push -y
@@ -82,13 +82,13 @@ pumpp hotfix --desc urgent-fix --push -y
 
 ## 3. 内置类型（默认配置）
 
-| 子命令    | 默认 pattern                              | 用途                                               |
-| --------- | ----------------------------------------- | -------------------------------------------------- |
-| `release` | `release/{version}-{date}`                | 从 `package.json` 读版本号；纯机器可推导，全自动   |
-| `feature` | `feature/{username}-{desc?}-{date}`       | 按作者 + 描述 + 日期；TTY 下会主动询问 `desc`（§3.1） |
-| `hotfix`  | `hotfix/{username}-{desc?}-{date}`        | 同 feature；用于紧急修复                           |
+| 子命令    | 默认 pattern                        | 用途                                             |
+| --------- | ----------------------------------- | ------------------------------------------------ |
+| `release` | `release/{version}-{date}`          | 发布分支；从 `package.json` 读版本号，并带日期   |
+| `feature` | `feature/{username}-{desc?}`        | 功能分支；默认按作者 + 描述命名                  |
+| `hotfix`  | `hotfix/{username}-{desc?}`         | 紧急修复分支；默认按作者 + 描述命名              |
 
-设计原则：`release` 是机器活、不打扰；`feature` / `hotfix` 是人意图、默认询问。
+设计原则：`release` 更偏自动化，默认带版本号和日期；`feature` / `hotfix` 更偏日常开发，默认不带日期，名称更短。
 
 ### 3.1 feature / hotfix 的 `desc` 自动询问
 
@@ -101,13 +101,13 @@ pumpp hotfix --desc urgent-fix --push -y
 | ❌ | ❌ | ❌ 非 TTY (CI) | 不问；可选 → 渲染成无 desc 名；必需 → `UNRESOLVED_TOKEN` |
 | ❌ | ❌ | ✅ TTY | **弹文本 prompt** 询问 `Description (fills {desc}):`，下方实时刷新分支预览 |
 
-TTY 下的交互长这样（每按一键，`Preview:` 行自动重绘）：
+在支持交互的终端里，输入 `desc` 时会实时预览分支名：
 
 ```
 Type:    feature
-Pattern: feature/{username}-{desc?}-{date}
+Pattern: feature/{username}-{desc?}
 ? Description (fills {desc}): fix-login█
-  Preview: feature/alice-fix-login-20260418
+  Preview: feature/alice-fix-login
 ```
 
 - 用户输入会按 git ref 规则做 slug（大写转小写、空格 / 下划线 → `-`、剥掉非法字符），所以 `Fix Login Bug` 实时预览成 `fix-login-bug`
@@ -123,14 +123,14 @@ Pattern: feature/{username}-{desc?}-{date}
 | 空回车 | 黄字警告 `! desc is empty; descriptive branches make code review and history scanning much easier` → 弹 confirm `Proceed without a desc? [Y/n]`<br/>· **Yes**（默认） → 接受空 desc，可选 token 被清掉<br/>· **No** → 再弹一次 desc text；这次输什么就用什么（不再二次确认，避免死循环）|
 | Ctrl-C / ESC | 直接中止，`ABORTED_BY_USER`（exit 0） |
 
-行为对照例（默认 pattern + git user 是 `alice` + 当天 `20260418`）：
+行为对照例（默认 pattern + git user 是 `alice`）：
 
 | 命令 | TTY 下 | CI / 非 TTY 下 |
 | --- | --- | --- |
-| `pumpp feature` | 弹 desc prompt → 输 `login` → §2.1 菜单 → `feature/alice-login-20260418` | 不问，渲染 `feature/alice-20260418` → §2.1 菜单 |
-| `pumpp feature -y` | 不问、不菜单，直接 `feature/alice-20260418` | 同 |
-| `pumpp feature --desc login` | 不问 desc，菜单仍弹，结果 `feature/alice-login-20260418` | 同 |
-| `pumpp feature --desc login -y` | 静默 `feature/alice-login-20260418` | 同 |
+| `pumpp feature` | 弹 desc prompt → 输 `login` → §2.1 菜单 → `feature/alice-login` | 不问，渲染 `feature/alice` → §2.1 菜单 |
+| `pumpp feature -y` | 不问、不菜单，直接 `feature/alice` | 同 |
+| `pumpp feature --desc login` | 不问 desc，菜单仍弹，结果 `feature/alice-login` | 同 |
+| `pumpp feature --desc login -y` | 静默 `feature/alice-login` | 同 |
 | `pumpp release` / `pumpp release -y` | 永远不问（pattern 不含 desc） | 同 |
 
 三类默认 `base = main`，与 spec §Q4 一致。要改 pattern / 新增类型，见 §5 配置。
@@ -206,7 +206,7 @@ pumpp init --force         # 覆盖已存在的配置
 项目根放一份，`pumpp` 会用 [`c12`](https://github.com/unjs/c12) 自动加载：`pumpp.config.{ts,js,mjs,cjs,json}`，也支持 `package.json` 里的 `"pumpp"` 字段。
 
 ```ts
-import { definePumpConfig } from 'pumpp'
+import { definePumpConfig } from 'pumpp-cli'
 
 export default definePumpConfig({
   base: 'main',
@@ -228,11 +228,11 @@ export default definePumpConfig({
       description: 'Create a release branch',
     },
     feature: {
-      pattern: 'feature/{username}-{desc?}-{date}',
+      pattern: 'feature/{username}-{desc?}',
       requiredTokens: ['username'],
     },
     hotfix: {
-      pattern: 'hotfix/{username}-{desc?}-{date}',
+      pattern: 'hotfix/{username}-{desc?}',
       base: 'main',
     },
     // 自定义类型自动生成子命令 `pumpp chore`
@@ -283,7 +283,7 @@ types: {
   release: { pattern: 'release/{version}-{date}' },
 
   // 跟随当前分支：在 dev 上就从 dev 切，在 release/v2 上就从 release/v2 切
-  feature: { pattern: 'feature/{username}-{date}-{desc?}', base: 'HEAD' },
+  feature: { pattern: 'feature/{username}-{desc?}', base: 'HEAD' },
   chore:   { pattern: 'chore/{desc}', base: '.' },
 }
 ```
@@ -298,18 +298,18 @@ pattern 是普通字符串 + 形如 `{name}` / `{name?}` 的 token 占位符。
 
 ```
 release/{version}-{date}
-feature/{username}-{date}-{desc?}
+feature/{username}-{desc?}
 ```
 
 ### 6.1 必需 vs 可选
 
-- `{name}` **必需**：解析失败 → `UNRESOLVED_TOKEN`
-- `{name?}` **可选**：解析失败则**连同相邻分隔符一起被清理**
+- `{name}` 是必需 token：解析不到就报 `UNRESOLVED_TOKEN`
+- `{name?}` 是可选 token：解析不到就跳过，并清理旁边多出来的分隔符
 
-例：pattern = `feature/{username}-{date}-{desc?}`
+例：pattern = `feature/{username}-{desc?}`
 
-- 有 `desc=login` → `feature/alice-20260418-login`
-- 无 `desc` → `feature/alice-20260418`（尾部 `-` 自动清理）
+- 有 `desc=login` → `feature/alice-login`
+- 无 `desc` → `feature/alice`（尾部 `-` 自动清理）
 
 ### 6.2 内置 providers
 
@@ -349,7 +349,7 @@ feature/{username}-{date}-{desc?}
 ### 7.1 自定义 / 覆盖 token provider
 
 ```ts
-import { definePumpConfig } from 'pumpp'
+import { definePumpConfig } from 'pumpp-cli'
 
 export default definePumpConfig({
   types: {
@@ -407,7 +407,7 @@ interface TokenContext {
 当 token-level 覆盖不够用——例如"pre-release 版本要改前缀"——挂一个 `customBranchName` 钩子：
 
 ```ts
-import { definePumpConfig } from 'pumpp'
+import { definePumpConfig } from 'pumpp-cli'
 
 export default definePumpConfig({
   types: {
@@ -455,7 +455,7 @@ interface NameContext {
 ## 8. 编程式 API
 
 ```ts
-import { loadPumpConfig, pumpBranch } from 'pumpp'
+import { loadPumpConfig, pumpBranch } from 'pumpp-cli'
 
 const result = await pumpBranch('release', {
   desc: 'v2-launch',
@@ -552,7 +552,7 @@ config-loaded → tokens-resolved → name-resolved → git-preflight
 
 ```bash
 pumpp feature --desc oauth-refresh
-# → feature/alice-20260418-oauth-refresh（确认后创建并 checkout）
+# → feature/alice-oauth-refresh（确认后创建并 checkout）
 ```
 
 ### 10.4 紧急修复
