@@ -31,8 +31,8 @@ describe('pumpBranch', () => {
       desc: 'login',
       yes: true,
     }, deps)
-    expect(r.branchName).toBe('feature/alice-login-20260418')
-    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-login-20260418', base: 'main', checkout: true })
+    expect(r.branchName).toBe('feature/alice-login')
+    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-login', base: 'main', checkout: true })
     expect(state.pushed).toHaveLength(0)
   })
 
@@ -42,8 +42,8 @@ describe('pumpBranch', () => {
       config: baseConfig(),
       yes: true,
     }, deps)
-    expect(r.branchName).toBe('feature/alice-20260418')
-    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice-20260418' })
+    expect(r.branchName).toBe('feature/alice')
+    expect(state.createdBranches[0]).toMatchObject({ name: 'feature/alice' })
   })
 
   it('uses runtime interactiveTokens for final custom-token rendering', async () => {
@@ -299,16 +299,16 @@ describe('previewBranchName', () => {
     const { deps } = createFakeDeps()
     const p = await previewBranchName('feature', { config: baseConfig() }, deps)
     expect(p.type).toBe('feature')
-    expect(p.pattern).toBe('feature/{username}-{desc?}-{date}')
-    expect(p.branchName).toBe('feature/alice-{desc?}-20260418')
+    expect(p.pattern).toBe('feature/{username}-{desc?}')
+    expect(p.branchName).toBe('feature/alice-{desc?}')
   })
 
   it('renderWith() slugs and fills {desc?} on demand without re-resolving tokens', async () => {
     const { deps } = createFakeDeps()
     const p = await previewBranchName('feature', { config: baseConfig() }, deps)
-    expect(p.renderWith({ desc: 'Fix Login Bug' })).toBe('feature/alice-fix-login-bug-20260418')
-    expect(p.renderWith({ desc: '  ' })).toBe('feature/alice-{desc?}-20260418')
-    expect(p.renderWith({})).toBe('feature/alice-{desc?}-20260418')
+    expect(p.renderWith({ desc: 'Fix Login Bug' })).toBe('feature/alice-fix-login-bug')
+    expect(p.renderWith({ desc: '  ' })).toBe('feature/alice-{desc?}')
+    expect(p.renderWith({})).toBe('feature/alice-{desc?}')
   })
 
   it('appends desc with separator when pattern has no {desc} slot', async () => {
@@ -326,7 +326,7 @@ describe('previewBranchName', () => {
     cfg.customBranchName = ctx => `${ctx.type}/hooked-${ctx.tokens.username}`
     const p = await previewBranchName('feature', { config: cfg }, deps)
     expect(p.branchName).toBe('feature/hooked-alice')
-    expect(p.renderWith({ desc: 'login' })).toBe('feature/alice-login-20260418')
+    expect(p.renderWith({ desc: 'login' })).toBe('feature/alice-login')
   })
 
   it('throws UNKNOWN_BRANCH_TYPE for unknown type', async () => {

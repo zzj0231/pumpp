@@ -102,17 +102,17 @@ describe("previewBranchName", () => {
       deps,
     );
 
-    expect(preview.branchName).toBe("feature/alice-initial-draft-20260418");
+    expect(preview.branchName).toBe("feature/alice-initial-draft");
     expect(preview.tokens.desc).toBe("initial-draft");
     expect(preview.missing).not.toContainEqual({
       name: "desc",
       optional: true,
       interactive: true,
     });
-    expect(preview.renderWith({})).toBe("feature/alice-initial-draft-20260418");
+    expect(preview.renderWith({})).toBe("feature/alice-initial-draft");
     expect(preview.renderWith({ desc: "Refined Copy" })).toBe(
-      "feature/alice-refined-copy-20260418",
+      "feature/alice-refined-copy",
     );
-    expect(preview.renderWith({ desc: "" })).toBe("feature/alice-{desc?}-20260418");
+    expect(preview.renderWith({ desc: "" })).toBe("feature/alice-{desc?}");
   });
 });
