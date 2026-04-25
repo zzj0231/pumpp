@@ -2,23 +2,24 @@
 
 English | [简体中文](./README.zh-CN.md)
 
-> Create convention-based Git branches from project config and manifest version.
+> Turn Git branch naming rules into shared project commands.
 
-`pumpp-cli` is a small CLI for turning branch naming rules into repeatable commands. Define your patterns once, then let `pumpp` render the branch name, validate it, create it, optionally check it out, and optionally push it.
+`pumpp-cli` lets a team define branch naming rules once in `pumpp.config`, then create branches with the same command locally and in CI. It renders tokens, validates the branch name, checks the base branch, creates the branch, optionally checks it out, and optionally pushes it.
 
 For the full manual, see [`docs/usage.md`](./docs/usage.md).
 
 ## When To Use It
 
-- Release branches need a stable version/date format.
-- Feature and hotfix branches should follow the same team naming rules.
-- You want fewer hand-written branch names and fewer typos.
+- Your team creates release branches often and is tired of hand-writing `git checkout -b ...`.
+- Branch naming rules currently live in docs, chats, or memory.
+- Release, feature, and hotfix branches need the same format across the team.
 - Local development and CI should share the same branch creation logic.
 
 ## Features
 
 - Works with zero config: built-in `release`, `feature`, and `hotfix` branch types.
 - Uses pattern tokens like `{version}`, `{date}`, `{username}`, and `{desc?}`.
+- Controls where a branch is created from with `base`, including `main`, `HEAD`, or `.`.
 - Cleans optional token separators automatically, so empty `{desc?}` does not leave a dangling `-`.
 - Prompts before creating a branch, with `Accept`, `Edit`, and `Cancel`.
 - Runs Git safety checks for dirty worktrees, invalid branch names, and branch name collisions.
@@ -37,21 +38,26 @@ Requires Node.js `>= 18`.
 ## Quick Start
 
 ```bash
-# Optional: create a starter config file
-pumpp init
+# Create a starter config file
+pnpm pumpp init
 
-# Create a release branch
-pumpp release
+# Add a shared project command
+pnpm pkg set scripts.branch="pumpp"
 
 # Pick a branch type interactively
-pumpp
+pnpm branch
+
+# Create a release branch
+pnpm branch release
 
 # Preview the branch name without changing Git
-pumpp feature --desc login --dry-run
+pnpm branch feature --desc login --dry-run
 
 # Create and push a hotfix branch
-pumpp hotfix --desc cve-fix --push -y
+pnpm branch hotfix --desc cve-fix --push -y
 ```
+
+You can also run the CLI directly with `pnpm pumpp release`, `pnpm pumpp feature --desc login`, or `pumpp release` if installed globally. For teams, a `package.json` script keeps the entrypoint visible and consistent.
 
 Default patterns match `pumpConfigDefaults` in `src/config.ts`:
 
@@ -60,6 +66,31 @@ Default patterns match `pumpConfigDefaults` in `src/config.ts`:
 | `release` | `release/{version}-{date}` |
 | `feature` | `feature/{username}-{desc?}` |
 | `hotfix` | `hotfix/{username}-{desc?}` |
+
+## Team Setup
+
+Recommended project entrypoints:
+
+```json
+{
+  "scripts": {
+    "branch": "pumpp",
+    "branch:release": "pumpp release",
+    "branch:feature": "pumpp feature",
+    "branch:hotfix": "pumpp hotfix"
+  }
+}
+```
+
+Then contributors can use:
+
+```bash
+pnpm branch
+pnpm branch:release
+pnpm branch:feature --desc login
+```
+
+This keeps branch creation close to the project, like `pnpm test` or `pnpm build`, instead of relying on everyone to remember a raw `git checkout -b` command.
 
 ## Built-In Tokens
 
@@ -87,12 +118,14 @@ export default definePumpConfig({
   base: 'main',
   types: {
     release: { pattern: 'release/{version}-{date}' },
-    feature: { pattern: 'feature/{username}-{desc?}' },
+    feature: { pattern: 'feature/{username}-{desc?}', base: 'HEAD' },
     hotfix: { pattern: 'hotfix/{username}-{desc?}' },
     chore: { pattern: 'chore/{username}-{desc}' },
   },
 })
 ```
+
+`pattern` controls the branch name. `base` controls where the branch is created from. A top-level `base: 'main'` is a safe default for release and hotfix flows; a type can override it with `base: 'HEAD'` or `base: '.'` when a branch should start from the current checkout.
 
 ## Custom Tokens
 
@@ -129,7 +162,7 @@ export default definePumpConfig({
       pattern: 'release/{version}-{date}',
       customBranchName: (ctx) => {
         if (/-(?:alpha|beta|rc)/.test(ctx.tokens.version ?? ''))
-          return ctx.branchName.replace(/^release\//, 'prerelease/')
+          return `prerelease/${ctx.tokens.version}-${ctx.tokens.date}`
       },
     },
   },

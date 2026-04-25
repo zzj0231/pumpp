@@ -2,23 +2,24 @@
 
 [English](./README.md) | 简体中文
 
-> 根据项目配置和 manifest 版本号，创建符合约定的 Git 分支。
+> 把 Git 分支命名规范变成团队共享命令。
 
-`pumpp-cli` 是一个小型 CLI，用来把团队的分支命名规则变成可重复执行的命令。你只需要定义一次 pattern，之后交给 `pumpp` 渲染分支名、校验、创建分支、可选切换分支，并可选推送到远端。
+`pumpp-cli` 让团队把分支命名规则写进 `pumpp.config`，然后在本地和 CI 使用同一套命令创建分支。它会渲染 token、校验分支名、检查 base 分支、创建分支、可选切换分支，并可选推送到远端。
 
 完整使用说明见 [`docs/usage.md`](./docs/usage.md)。
 
 ## 适用场景
 
-- 发布分支需要固定的版本号和日期格式。
-- `feature` / `hotfix` 分支需要统一团队命名规则。
-- 想减少手写分支名带来的拼写错误和格式漂移。
+- 团队经常创建发布分支，已经厌倦手写 `git checkout -b ...`。
+- 分支命名规则散落在文档、群消息或个人记忆里。
+- `release`、`feature`、`hotfix` 分支需要统一团队格式。
 - 本地开发和 CI 希望共用同一套分支创建逻辑。
 
 ## 特性
 
 - 零配置可用：内置 `release`、`feature`、`hotfix` 三类分支。
 - 支持 `{version}`、`{date}`、`{username}`、`{desc?}` 等 pattern token。
+- 通过 `base` 控制分支从哪里创建，例如 `main`、`HEAD` 或 `.`。
 - 可选 token 会自动清理多余分隔符，例如 `{desc?}` 为空时不会留下多余的 `-`。
 - 创建分支前会提示 `Accept`、`Edit`、`Cancel`。
 - 提供 Git 安全检查：工作区状态、分支名合法性、同名分支碰撞。
@@ -37,21 +38,26 @@ pnpm add -g pumpp-cli
 ## 快速开始
 
 ```bash
-# 可选：创建配置文件脚手架
-pumpp init
+# 创建配置文件脚手架
+pnpm pumpp init
 
-# 创建 release 分支
-pumpp release
+# 添加团队共享入口
+pnpm pkg set scripts.branch="pumpp"
 
 # 交互式选择分支类型
-pumpp
+pnpm branch
+
+# 创建 release 分支
+pnpm branch release
 
 # 只预览分支名，不修改 Git
-pumpp feature --desc login --dry-run
+pnpm branch feature --desc login --dry-run
 
 # 创建并推送 hotfix 分支
-pumpp hotfix --desc cve-fix --push -y
+pnpm branch hotfix --desc cve-fix --push -y
 ```
+
+也可以直接使用 CLI，例如 `pnpm pumpp release`、`pnpm pumpp feature --desc login`，或全局安装后运行 `pumpp release`。对团队来说，把入口写进 `package.json` scripts 更清晰，也更容易保持一致。
 
 默认规则与 `src/config.ts` 里的 `pumpConfigDefaults` 一致：
 
@@ -60,6 +66,31 @@ pumpp hotfix --desc cve-fix --push -y
 | `release` | `release/{version}-{date}` |
 | `feature` | `feature/{username}-{desc?}` |
 | `hotfix` | `hotfix/{username}-{desc?}` |
+
+## 团队接入
+
+推荐在项目里提供统一入口：
+
+```json
+{
+  "scripts": {
+    "branch": "pumpp",
+    "branch:release": "pumpp release",
+    "branch:feature": "pumpp feature",
+    "branch:hotfix": "pumpp hotfix"
+  }
+}
+```
+
+团队成员可以直接使用：
+
+```bash
+pnpm branch
+pnpm branch:release
+pnpm branch:feature --desc login
+```
+
+这样分支创建入口会像 `pnpm test` 或 `pnpm build` 一样留在项目里，不需要每个人记住原始的 `git checkout -b` 命令。
 
 ## 内置 Token
 
@@ -87,12 +118,14 @@ export default definePumpConfig({
   base: 'main',
   types: {
     release: { pattern: 'release/{version}-{date}' },
-    feature: { pattern: 'feature/{username}-{desc?}' },
+    feature: { pattern: 'feature/{username}-{desc?}', base: 'HEAD' },
     hotfix: { pattern: 'hotfix/{username}-{desc?}' },
     chore: { pattern: 'chore/{username}-{desc}' },
   },
 })
 ```
+
+`pattern` 控制分支名，`base` 控制分支从哪里切出来。顶层 `base: 'main'` 适合作为发布和热修流程的安全默认值；某个类型也可以覆盖成 `base: 'HEAD'` 或 `base: '.'`，表示从当前 checkout 的分支创建。
 
 ## 自定义 Token
 
@@ -129,7 +162,7 @@ export default definePumpConfig({
       pattern: 'release/{version}-{date}',
       customBranchName: (ctx) => {
         if (/-(?:alpha|beta|rc)/.test(ctx.tokens.version ?? ''))
-          return ctx.branchName.replace(/^release\//, 'prerelease/')
+          return `prerelease/${ctx.tokens.version}-${ctx.tokens.date}`
       },
     },
   },
